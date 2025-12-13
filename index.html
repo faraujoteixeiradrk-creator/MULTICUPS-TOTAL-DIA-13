@@ -1211,7 +1211,18 @@
                     kwh = data[`consumo_p${i}`] || 0;
                 }
                 
-                const price = tariff[`p${i}_price`] || 0;
+                // Get the raw price from the tariff sheet
+                let price = tariff[`p${i}_price`] || 0;
+
+                // --- FIX: SCALING CORRECTION FOR ENERGY PRICES (E1-E6) ---
+                // The user reported an error where the price was read as 159.000000 instead of 0.159000.
+                // If the price is unrealistically high (> 5.0 €/kWh), assume it's a millicents error and scale down.
+                if (price > 5.0) { 
+                    // Example: 159 -> 0.159
+                    price = price / 1000;
+                }
+                // --- END FIX ---
+
                 const cost = kwh * price;
                 energyCosts.push({ period: i, cost: cost, price: price, kwh: kwh });
                 subEnergy += cost;
@@ -1911,21 +1922,21 @@
             }
 
             const emailBody = `Hola ${D_BRAND_NAME.toUpperCase()}, confirmo la aceptación de la oferta con CUPS: ${bd.cups}.${LB}${LB}` +
-                                 `--- DATOS DE LA OFERTA ---${LB}${LB}` +
-                                 `Comercializadora y Tarifa: ${D_BRAND_NAME.toUpperCase()} - ${offer.name}${LB}` +
-                                 `Ahorro Anual Estimado: ${eur(bd.savings)}${LB}` +
-                                 `Total Mensual Estimado: ${monthlyEstimate}${LB}` +
-                                 `Consumo Total Facturado: ${totalConsumption}${LB}` +
-                                 `${discountLine}` + 
-                                 `--- DETALLE DE PRECIOS (€) ---${LB}` +
-                                 `${priceDetailText}` +
-                                 `------------------------------${LB}${LB}` +
-                                 `DATOS DEL CLIENTE (A RELLENAR):${LB}` +
-                                 `Nombre completo: ${clientName}${LB}` +
-                                 `Teléfono de contacto: ${clientPhone}${LB}` +
-                                 `Email de contacto: ${clientEmail}${LB}${LB}` +
-                                 `INFORMACIÓN ADICIONAL:${LB}` +
-                                 `[AGREGUE CUALQUIER COMENTARIO EXTRA AQUÍ]${LB}${LB}`;
+                                `--- DATOS DE LA OFERTA ---${LB}${LB}` +
+                                `Comercializadora y Tarifa: ${D_BRAND_NAME.toUpperCase()} - ${offer.name}${LB}` +
+                                `Ahorro Anual Estimado: ${eur(bd.savings)}${LB}` +
+                                `Total Mensual Estimado: ${monthlyEstimate}${LB}` +
+                                `Consumo Total Facturado: ${totalConsumption}${LB}` +
+                                `${discountLine}` + 
+                                `--- DETALLE DE PRECIOS (€) ---${LB}` +
+                                `${priceDetailText}` +
+                                `------------------------------${LB}${LB}` +
+                                `DATOS DEL CLIENTE (A RELLENAR):${LB}` +
+                                `Nombre completo: ${clientName}${LB}` +
+                                `Teléfono de contacto: ${clientPhone}${LB}` +
+                                `Email de contacto: ${clientEmail}${LB}${LB}` +
+                                `INFORMACIÓN ADICIONAL:${LB}` +
+                                `[AGREGUE CUALQUIER COMENTARIO EXTRA AQUÍ]${LB}${LB}`;
 
             const subject = `FORMALIZACIÓN DE CONTRATO - CUPS: ${bd.cups}`;
             const formalizationRecipients = 'f.araujo@drk.es,r.guerra@drk.es,s.caballero@drk.es'; // Email por defecto
@@ -2399,7 +2410,7 @@
         // --- FETCH & PARSE ---
 
         window.fetchTariffsFromSheet = async () => {
-            // REMOVED: if (!isAuthReady) return; (Tariff fetching is independent of Firebase Auth)
+            // REMOVED: if (!isAuthReady) return; (Tariff fetching is independent of Firebase auth)
 
             const statusEl = document.getElementById('loading-status');
             statusEl.textContent = `Cargando tarifas ${window.currentTariffType}...`;
