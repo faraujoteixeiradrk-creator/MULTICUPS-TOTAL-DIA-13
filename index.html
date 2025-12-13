@@ -1237,6 +1237,12 @@
         }
 
         function compareOffers(data) {
+            // FIX: Check if tariffs are loaded before performing the comparison
+            if (window.currentTariffs.length === 0) {
+                window.showErrorModal("No hay tarifas cargadas. Intente recargar la página o verifique la conexión a Internet.", "Error de Datos");
+                return;
+            }
+
             const results = window.currentTariffs.map(t => calculateTariffCost(t, data));
             
             let bestOverall = null;
@@ -2396,28 +2402,38 @@
 
             try {
                 // Implementing retry logic for robustness against transient network/server issues
-                let response = await fetch(url);
+                let response = null;
                 let attempts = 1;
                 const maxAttempts = 3;
-                while (!response.ok && attempts < maxAttempts) {
-                    await new Promise(resolve => setTimeout(resolve, 1000 * (2 ** attempts))); // Exponential backoff
-                    response = await fetch(url);
+                
+                while (attempts <= maxAttempts) {
+                    try {
+                        response = await fetch(url);
+                        if (response.ok) break;
+                    } catch (e) {
+                        console.warn(`Intento ${attempts} fallido: ${e.message}`);
+                    }
+
+                    if (attempts < maxAttempts) {
+                        await new Promise(resolve => setTimeout(resolve, 1000 * (2 ** attempts))); // Exponential backoff
+                    }
                     attempts++;
                 }
 
-                if (!response.ok) throw new Error(`Error red: HTTP ${response.status}`);
+                if (!response || !response.ok) throw new Error(`Error red: HTTP ${response?.status || 'Fallo de conexión'}`);
+                
                 const text = await response.text();
                 window.currentTariffs = parseCSV(text);
                 
                 document.getElementById('tariff-display-badge').textContent = window.currentTariffs.length;
                 statusEl.classList.add('hidden');
                 
-                if(window.currentTariffs.length === 0) window.showErrorModal("No se encontraron tarifas en la hoja.");
+                if(window.currentTariffs.length === 0) window.showErrorModal("No se encontraron tarifas válidas en la hoja de cálculo. Por favor, revise la configuración.", "Error de Datos");
                 
             } catch (e) {
                 console.error(e);
                 statusEl.textContent = "Error cargando tarifas.";
-                window.showErrorModal(`Error de conexión con Google Sheets: ${e.message}`);
+                window.showErrorModal(`Error de conexión con Google Sheets: ${e.message}. El comparador no podrá funcionar sin tarifas.`, "Error de Carga Crítico");
             }
         }
 
@@ -2568,9 +2584,9 @@
                 
                 // Asegurar que el logo DRK no tiene clases de formato multilínea si se re-activa.
                 if (input.value !== 'overall_best') {
-                      // Solo para DRK Únicamente y DRK Prioritario
-                      label.classList.remove('p-1', 'text-center');
-                      label.classList.add('px-2', 'py-2');
+                     // Solo para DRK Únicamente y DRK Prioritario
+                     label.classList.remove('p-1', 'text-center');
+                     label.classList.add('px-2', 'py-2');
                 }
             });
         }
