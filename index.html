@@ -560,7 +560,7 @@
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
         import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
         import { getFirestore, doc, setDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
-        import { setLogLevel } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+        // import { setLogLevel } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js"; // No needed unless debugging
 
         // Global Firebase variables
         let db = null;
@@ -570,6 +570,7 @@
         let isAuthReady = false;
 
         // Configuration setup - Mandatory Canvas Globals
+        // Provide safe fallbacks if running outside Canvas environment
         const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : {};
         const initialAuthToken = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null;
         appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
@@ -631,7 +632,10 @@
                     btn.classList.remove('bg-slate-100', 'text-slate-700', 'hover:bg-slate-200');
                     btn.classList.add('bg-drk-500', 'hover:bg-drk-600', 'text-white', 'shadow-lg');
                     btn.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd" /></svg>Multicups (Activo: ${loadedResults.length})`;
-
+                    
+                    document.getElementById('comparison-mode-selectors').classList.add('hidden'); // Hide mode selectors
+                    window.isMulticupsMode = true; // Ensure state is correct globally
+                    
                 } else if (window.multicupsResults && window.multicupsResults.length > 0) {
                     // This handles when the local data is cleared and the snapshot is empty/deleted
                     window.multicupsResults = [];
@@ -652,7 +656,11 @@
         }
 
         async function initFirebase() {
-            if (Object.keys(firebaseConfig).length === 0) return console.error("Firebase config is missing.");
+            // Only attempt to initialize if essential config is present (i.e., running in Canvas)
+            if (!firebaseConfig.apiKey) {
+                console.warn("Firebase configuration incomplete. Multicups persistence disabled.");
+                return;
+            }
             
             try {
                 // setLogLevel('Debug'); // Enable debug logging for Firebase
@@ -675,8 +683,7 @@
                         document.getElementById('loading-status').textContent = `App lista. Usuario: ${userId}`;
                         setTimeout(() => document.getElementById('loading-status').classList.add('hidden'), 2000);
                         
-                        // Load tariffs once authentication is complete
-                        window.fetchTariffsFromSheet();
+                        // Setup listener only after auth is ready
                         setupMulticupsListener();
 
                     } else {
@@ -1117,6 +1124,7 @@
             document.getElementById('landing-view').classList.add('hidden');
             document.getElementById('initial-view').classList.remove('hidden');
             
+            // Reload tariffs in case a different sheet is needed
             window.fetchTariffsFromSheet();
 
             if (document.getElementById('qr-toggle-checkbox').checked) {
@@ -1293,6 +1301,7 @@
             if (final.totalAnnual >= currentBill.totalAnnual) {
                  final.isNegativeSavings = true;
                  final.savings = 0;
+                 // Note: totalAnnual is kept as the lowest projected annual cost (which is current bill cost)
                  final.totalAnnual = currentBill.totalAnnual;
                  final.offer = currentBill.offer;
             } else {
@@ -1600,7 +1609,7 @@
                     <div class="text-center border-b-2 border-dashed border-slate-300 pb-4 mb-4">
                         <h4 class="font-bold text-lg text-slate-800 uppercase">${res.offer.name}</h4>
                         <p>Simulación ${res.dias_facturados} días</p>
-                        <p class="mt-2 text-2xl font-black text-green-500">Ahorro: ${eur(res.savings)}</p>
+                        <p class="mt-2 text-2xl font-black ${res.savings > 0 ? 'text-green-500' : 'text-slate-500'}">Ahorro: ${eur(res.savings)}</p>
                     </div>
                     <!-- POTENCIA -->
                     <div class="mb-4">
@@ -1701,7 +1710,7 @@
                 cupsBreakdownHTML += `
                     <tr class="border-b last:border-b-0">
                         <td class="py-2 font-mono text-xs text-slate-700">${res.cups} (${res.cups_type})</td>
-                        <td class="py-2 text-right font-bold text-green-600">${eur(res.savings)}</td>
+                        <td class="py-2 text-right font-bold ${res.savings > 0 ? 'text-green-600' : 'text-slate-500'}">${eur(res.savings)}</td>
                     </tr>
                 `;
             });
@@ -2390,7 +2399,7 @@
         // --- FETCH & PARSE ---
 
         window.fetchTariffsFromSheet = async () => {
-            if (!isAuthReady) return;
+            // REMOVED: if (!isAuthReady) return; (Tariff fetching is independent of Firebase Auth)
 
             const statusEl = document.getElementById('loading-status');
             statusEl.textContent = `Cargando tarifas ${window.currentTariffType}...`;
@@ -2758,7 +2767,13 @@
             navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } }).then(s => {
                 stream = s; video.srcObject = s;
                 video.onloadedmetadata = () => { video.play(); scanLoop(); };
-            }).catch(e => { console.error(e); stopScanner(); window.resetToLanding(); window.showErrorModal("Error al acceder a la cámara. Intente subir una imagen."); });
+            }).catch(e => { 
+                console.error(e); 
+                stopScanner(); 
+                window.resetToLanding(); 
+                // Enhanced Error Message for external use
+                window.showErrorModal("Error al acceder a la cámara. La mayoría de los navegadores requieren una conexión segura (HTTPS) para el escaneo en vivo. Por favor, use 'Opciones QR Manual' o 'Datos a Mano'."); 
+            });
         }
         function scanLoop() {
             if (!scannerRunning || !video || video.readyState !== video.HAVE_ENOUGH_DATA) { animationFrameId = requestAnimationFrame(scanLoop); return; }
@@ -2847,10 +2862,11 @@
                 updateComparisonMode(initialModeInput.value);
             }
 
-            // Iniciar Firebase (se encarga de cargar tarifas y data multicups)
-            document.getElementById('loading-status').textContent = `Conectando a DRK Cloud...`;
-            document.getElementById('loading-status').classList.remove('hidden');
-            initFirebase();
+            // CRITICAL FIX: Load tariffs immediately, regardless of Firebase auth success.
+            window.fetchTariffsFromSheet();
+
+            // Try to initiate Firebase for Multicups persistence (will fail gracefully outside Canvas)
+            initFirebase(); 
         });
     </script>
 </body>
