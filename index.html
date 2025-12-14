@@ -565,7 +565,7 @@
                 QR_TEXT: 'DRK',
                 QR_BORDER_COLOR: '#0ea5e9', // drk-500
                 QR_CENTER_BG: '#075985', // drk-800
-                PRIMARY_BG_GRADIENT: 'from-drk-800 to-drk-600',  
+                PRIMARY_BG_GRADIENT: 'from-drk-800 to-drk-600', 
                 PRIMARY_BUTTON: 'from-drk-600 to-drk-800 hover:from-drk-700 hover:to-drk-900', // ESCANEAR QR
                 SECONDARY_BUTTON_BG: 'bg-drk-50', // OPCIONES QR MANUAL / DATOS A MANO BG
                 SECONDARY_BUTTON_TEXT: 'text-drk-800', // OPCIONES QR MANUAL / DATOS A MANO Text
@@ -580,7 +580,7 @@
                 QR_TEXT: 'POWER',
                 QR_BORDER_COLOR: '#84cc16', // powercup-500
                 QR_CENTER_BG: '#3f6212', // powercup-800
-                PRIMARY_BG_GRADIENT: 'from-powercup-900 to-powercup-800',  
+                PRIMARY_BG_GRADIENT: 'from-powercup-900 to-powercup-800', 
                 PRIMARY_BUTTON: 'from-powercup-600 to-powercup-800 hover:from-powercup-500 hover:to-powercup-900', // ESCANEAR QR
                 SECONDARY_BUTTON_BG: 'bg-powercup-50', // OPCIONES QR MANUAL / DATOS A MANO BG
                 SECONDARY_BUTTON_TEXT: 'text-powercup-800', // OPCIONES QR MANUAL / DATOS A MANO Text
@@ -1174,14 +1174,14 @@
             // Aplicar lógica de modo de comparación (Individual)
             if (comparisonMode === 'drk_only') {
                  // DRK ÚNICAMENTE: Usamos la mejor DRK si existe, si no, la mejor overall (que será la tarifa actual si no hubo ahorro)
-                final = bestDrk || bestOverall;
+                 final = bestDrk || bestOverall;
             } else if (comparisonMode === 'drk_prioritized') {
                  // DRK PRIORITARIO: Usar la mejor DRK si ofrece ahorro (>0). Si no ofrece ahorro, usar la mejor overall.
-                if (bestDrk && bestDrk.totalAnnual < bestDrk.originalBillAnnual) {
-                    final = bestDrk;
-                } else {
-                    final = bestOverall;
-                }
+                 if (bestDrk && bestDrk.totalAnnual < bestDrk.originalBillAnnual) {
+                     final = bestDrk;
+                 } else {
+                     final = bestOverall;
+                 }
             } // If comparisonMode === 'overall_best', final = bestOverall (which is what we set initially)
             
             // Re-calculate the final savings based on the selected 'final' result's annual cost
@@ -1461,8 +1461,8 @@
             
             // 2. Nuevo: Resumen de Suministros (Tipo, CUPS, Ahorro Individual)
             let summaryListHTML = individualResults.map((resItem, index) => {
-                // FIX: Eliminar el coste original de la frase "Sin Ahorro" en la vista interna.
-                const savingsText = resItem.isNegativeSavings ? `(Sin Ahorro)` : `(Ahorro: ${eur(resItem.savings)})`;
+                // MODIFICACIÓN #2: Eliminar "Sin Ahorro" en la vista interna, dejando un espacio.
+                const savingsText = resItem.isNegativeSavings ? `&nbsp;` : `(Ahorro: ${eur(resItem.savings)})`;
                 return `<div class="flex justify-between items-center py-1 border-b border-slate-100 last:border-b-0">
                     <span class="font-bold text-sm text-slate-700">${resItem.cups}</span>
                     <span class="text-xs text-drk-800 font-semibold">${resItem.originalTariffType}</span>
@@ -1568,7 +1568,7 @@
             if (best20TD && has20TD) {
                 drkPrices.push(`
                     <div class="mb-4 p-3 bg-white rounded-lg border border-drk-100">
-                        <h5 class="font-black text-sm text-drk-800 border-b pb-1 mb-2">Tarifa 2.0 TD (Hogar/Negocio)</h5>
+                        <h5 class="font-black text-sm text-drk-800 border-b pb-1 mb-2">Tarifa 2.0 TD (Hogar/Negocio) - ${best20TD.name || 'DRK Tarifa 2.0TD'}</h5>
                         <div class="grid grid-cols-2 gap-x-4 text-xs">
                             <p class="text-slate-500">P1 (€/kW/día):</p><p class="font-mono font-bold text-right">${numPriceFormula(best20TD.p_potencia_1 / 365)}</p>
                             <p class="text-slate-500">P2 (€/kW/día):</p><p class="font-mono font-bold text-right">${numPriceFormula(best20TD.p_potencia_2 / 365)}</p>
@@ -1594,7 +1594,7 @@
 
                 drkPrices.push(`
                     <div class="mb-4 p-3 bg-white rounded-lg border border-drk-100">
-                        <h5 class="font-black text-sm text-drk-800 border-b pb-1 mb-2">Tarifa 3.0 TD / 6.1 TD (Industria/Consumo)</h5>
+                        <h5 class="font-black text-sm text-drk-800 border-b pb-1 mb-2">Tarifa 3.0 TD / 6.1 TD (Industria/Consumo) - ${best30TD.name || 'DRK Tarifa 3.0TD/6.1TD'}</h5>
                         <div class="grid grid-cols-2 md:grid-cols-4 gap-x-4 text-xs">
                             <div class="col-span-2 md:col-span-4 font-bold text-red-600 mb-1">POTENCIA (€/kW/día)</div>
                             ${pRows}
@@ -1649,7 +1649,7 @@
                  });
                     
                 const statusText = resItem.isNegativeSavings ?  
-                    `<p class="text-sm font-bold text-red-600 mb-2">⚠️ TU TARIFA ACTUAL es la mejor (Sin Ahorro)</p>` :
+                    `<p class="text-sm font-bold text-red-600 mb-2">⚠️ TU TARIFA ACTUAL es la mejor</p>` :
                     `<p class="text-sm font-bold text-green-600 mb-2">💰 AHORRO ANUAL: ${eur(resItem.savings)}</p>`;
 
                 allBreakdownsHTML += `
@@ -1809,7 +1809,7 @@
                  if (p.kw > 0 || p.period <= config.powerPeriods) {
                       powerBreakdown += `<div class="flex justify-between"><span>P${p.period} (${num(p.kw, 2)} kW x ${numPriceFormula(p.priceDay)} €/día)</span><span>${num(p.cost, 2)} €</span></div>`;
                  }
-                 });
+             });
                 
             let energyBreakdown = '';
             res.energyCosts.forEach(e => {
@@ -2240,16 +2240,16 @@
                     <tr><td style="padding: 5px 8px; font-weight: bold; color: #CC0000;">DESCUENTO COMERCIAL (${num(resItem.discountRate * 100, 0)}%)</td><td style="padding: 5px 8px; text-align: right; font-weight: bold; color: #CC0000; white-space: nowrap;">-${num(resItem.discountAmount, 2)} €</td></tr>
                     ` : '';
 
-                // FIX 1: Modificar la línea de Ahorro Anual para no mostrar el importe cuando es negativo
-                const ahorroAnualLine = isBest ?  
-                    `<span style="color: ${GREEN_SAVE}; font-weight: bold;">${eur(resItem.savings)}</span>` :  
-                    `<span style="color: #CC0000; font-weight: bold;">Sin Ahorro</span>`;
+                // MODIFICACIÓN #2: Ajuste para eliminar "Sin Ahorro" y el texto "Ahorro Anual:" si no hay ahorro.
+                const ahorroAnualText = isBest
+                    ? `. Ahorro Anual: <span style="color: ${GREEN_SAVE}; font-weight: bold;">${eur(resItem.savings)}</span>`
+                    : '';
 
                 individualBreakdowns += `
                     <tr><td colspan="2" style="padding: 15px 20px 0 20px; background-color: #f8fafc; border-top: 2px solid #ddd;">
                         <h4 style="margin: 0 0 10px 0; font-size: 16px; color: ${D_PRIMARY_DARK}; font-weight: bold;">[${index + 1}] CUPS: ${resItem.cups} (${resItem.originalTariffType})</h4>
                         <p style="margin: 0 0 5px 0; font-size: 12px; color: #555;">Tarifa Aplicada: <span style="font-weight: bold;">${appliedOfferName}</span></p>
-                        <p style="margin: 0 0 10px 0; font-size: 12px; color: #555;">Días Facturados: ${resItem.dias_facturados}. Ahorro Anual: ${ahorroAnualLine}</p>
+                        <p style="margin: 0 0 10px 0; font-size: 12px; color: #555;">Días Facturados: ${resItem.dias_facturados}${ahorroAnualText}</p>
                         
                         <table width="100%" cellpadding="0" cellspacing="0" style="table-layout: fixed; margin-bottom: 10px; background-color: white; border: 1px solid #eee;">
                             <tr style="background-color: #f5f5f5;">
@@ -2299,10 +2299,10 @@
             let preciosConsolidadosHTML = '';
             
             // 2.0TD Prices
-            if (offer20 && has20TD) { // FIX: Solo renderizar si hay CUPS de este tipo
+            if (offer20 && has20TD) { // MODIFICACIÓN #1: Se añade offer20.name
                 preciosConsolidadosHTML += `
                     <div style="margin-top: 15px; padding: 10px; background-color: #ffffff; border: 1px solid #ddd; border-radius: 6px;">
-                        <p style="margin: 0 0 5px 0; font-weight: bold; font-size: 13px; color: ${D_PRIMARY_DARK};">Tarifa 2.0 TD (Hogar/Negocio)</p>
+                        <p style="margin: 0 0 5px 0; font-weight: bold; font-size: 13px; color: ${D_PRIMARY_DARK};">Tarifa 2.0 TD (Hogar/Negocio) - ${offer20.name || 'DRK Tarifa 2.0TD'}</p>
                         <table width="100%" cellpadding="0" cellspacing="0" style="font-family: Arial, sans-serif; font-size: 11px; table-layout: fixed;">
                             <tr><td style="padding: 2px 0; width: 60%;">P1 (€/kW/día):</td><td style="text-align: right; font-weight: bold; font-family: monospace;">${numPriceFormula(offer20.p_potencia_1 / 365)}</td></tr>
                             <tr><td style="padding: 2px 0;">P2 (€/kW/día):</td><td style="text-align: right; font-weight: bold; font-family: monospace;">${numPriceFormula(offer20.p_potencia_2 / 365)}</td></tr>
@@ -2316,7 +2316,7 @@
             }
 
             // 3.0TD Prices (P1-P6, E1-E6)
-            if (offer30 && has30TD) { // FIX: Solo renderizar si hay CUPS de este tipo
+            if (offer30 && has30TD) { // MODIFICACIÓN #1: Se añade offer30.name
                 let pRows = '';
                 for(let i=1; i<=6; i++) {
                     pRows += `<tr><td style="padding: 2px 0;">P${i} (€/kW/día):</td><td style="text-align: right; font-weight: bold; font-family: monospace;">${numPriceFormula(offer30[`p_potencia_${i}`] / 365)}</td></tr>`;
@@ -2328,7 +2328,7 @@
 
                 preciosConsolidadosHTML += `
                     <div style="margin-top: 15px; padding: 10px; background-color: #ffffff; border: 1px solid #ddd; border-radius: 6px;">
-                        <p style="margin: 0 0 5px 0; font-weight: bold; font-size: 13px; color: ${D_PRIMARY_DARK};">Tarifa 3.0 TD / 6.1 TD (Industria/Consumo)</p>
+                        <p style="margin: 0 0 5px 0; font-weight: bold; font-size: 13px; color: ${D_PRIMARY_DARK};">Tarifa 3.0 TD / 6.1 TD (Industria/Consumo) - ${offer30.name || 'DRK Tarifa 3.0TD/6.1TD'}</p>
                         <table width="100%" cellpadding="0" cellspacing="0" style="font-family: Arial, sans-serif; font-size: 11px; table-layout: fixed;">
                             <tr><td colspan="2" style="font-weight: bold; color: #CC0000; padding: 5px 0 2px 0;">POTENCIA</td></tr>
                             ${pRows}
@@ -2865,8 +2865,8 @@
                     
                     dataForCalc.potencia_p3_kw = p1_kw;
                     dataForCalc.potencia_p4_kw = p2_kw;
-                    dataForCalc.potencia_p5_kw = p1_kw; 
-                    dataForCalc.potencia_p6_kw = p2_kw; 
+                    dataForCalc.potencia_p5_kw = p1_kw;  
+                    dataForCalc.potencia_p6_kw = p2_kw;  
                     
                     dataForCalc.consumo_p1 = data.consumo_punta || 0; // E1 (Punta)
                     dataForCalc.consumo_p2 = data.consumo_llano || 0; // E2 (Llano)
