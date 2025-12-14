@@ -560,7 +560,7 @@
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
         import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
         import { getFirestore, doc, setDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
-        // import { setLogLevel } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js"; // No needed unless debugging
+        import { setLogLevel } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
         // Global Firebase variables
         let db = null;
@@ -570,13 +570,65 @@
         let isAuthReady = false;
 
         // Configuration setup - Mandatory Canvas Globals
-        // Provide safe fallbacks if running outside Canvas environment
         const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : {};
         const initialAuthToken = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null;
         appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
 
 
         // --- FIREBASE PERSISTENCE FUNCTIONS ---
+
+        /**
+         * Saves the current commercial and client data to Firestore.
+         * Path: /artifacts/{appId}/users/{userId}/user_data/offer_config
+         */
+        async function saveOfferConfig() {
+            if (!isAuthReady || !userId || !db) return console.warn("Firestore not ready. Offer config not saved.");
+            
+            const commercialCode = document.getElementById('comercial-code-input').value.trim();
+            const clientName = document.getElementById('client-name-input').value.trim();
+            const clientPhone = document.getElementById('client-phone-input').value.trim();
+            const clientEmail = document.getElementById('client-email-input').value.trim();
+
+            const path = `artifacts/${appId}/users/${userId}/user_data`;
+            const docRef = doc(db, path, 'offer_config');
+
+            try {
+                await setDoc(docRef, {
+                    commercialCode: commercialCode,
+                    clientName: clientName,
+                    clientPhone: clientPhone,
+                    clientEmail: clientEmail,
+                    updatedAt: new Date().toISOString()
+                }, { merge: true });
+                // console.log("Offer config saved.");
+            } catch (e) {
+                console.error("Error saving Offer config:", e);
+            }
+        }
+
+        /**
+         * Sets up a real-time listener for the user's persisted offer configuration.
+         */
+        function setupOfferConfigListener() {
+            if (!isAuthReady || !userId || !db) return;
+
+            const path = `artifacts/${appId}/users/${userId}/user_data`;
+            const docRef = doc(db, path, 'offer_config');
+
+            const unsubscribe = onSnapshot(docRef, (docSnap) => {
+                if (docSnap.exists()) {
+                    const data = docSnap.data();
+                    document.getElementById('comercial-code-input').value = data.commercialCode || '';
+                    document.getElementById('client-name-input').value = data.clientName || '';
+                    document.getElementById('client-phone-input').value = data.clientPhone || '';
+                    document.getElementById('client-email-input').value = data.clientEmail || '';
+                    // console.log("Offer config loaded and applied.");
+                }
+            }, (error) => {
+                console.error("Firestore Offer Config Listener error:", error);
+            });
+            // return unsubscribe;
+        }
 
         /**
          * Saves the current multicups results array to Firestore.
@@ -632,10 +684,7 @@
                     btn.classList.remove('bg-slate-100', 'text-slate-700', 'hover:bg-slate-200');
                     btn.classList.add('bg-drk-500', 'hover:bg-drk-600', 'text-white', 'shadow-lg');
                     btn.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd" /></svg>Multicups (Activo: ${loadedResults.length})`;
-                    
-                    document.getElementById('comparison-mode-selectors').classList.add('hidden'); // Hide mode selectors
-                    window.isMulticupsMode = true; // Ensure state is correct globally
-                    
+
                 } else if (window.multicupsResults && window.multicupsResults.length > 0) {
                     // This handles when the local data is cleared and the snapshot is empty/deleted
                     window.multicupsResults = [];
@@ -656,11 +705,7 @@
         }
 
         async function initFirebase() {
-            // Only attempt to initialize if essential config is present (i.e., running in Canvas)
-            if (!firebaseConfig.apiKey) {
-                console.warn("Firebase configuration incomplete. Multicups persistence disabled.");
-                return;
-            }
+            if (Object.keys(firebaseConfig).length === 0) return console.error("Firebase config is missing.");
             
             try {
                 // setLogLevel('Debug'); // Enable debug logging for Firebase
@@ -683,7 +728,10 @@
                         document.getElementById('loading-status').textContent = `App lista. Usuario: ${userId}`;
                         setTimeout(() => document.getElementById('loading-status').classList.add('hidden'), 2000);
                         
-                        // Setup listener only after auth is ready
+                        // Load persistent data once authentication is complete
+                        setupOfferConfigListener();
+                        // Load tariffs once authentication is complete
+                        window.fetchTariffsFromSheet();
                         setupMulticupsListener();
 
                     } else {
@@ -1124,7 +1172,6 @@
             document.getElementById('landing-view').classList.add('hidden');
             document.getElementById('initial-view').classList.remove('hidden');
             
-            // Reload tariffs in case a different sheet is needed
             window.fetchTariffsFromSheet();
 
             if (document.getElementById('qr-toggle-checkbox').checked) {
@@ -1205,24 +1252,15 @@
             for (let i = 1; i <= config.periods; i++) {
                 // Ensure we get the correct consumption values based on structure
                 let kwh = 0;
+                // For 2.0TD, use specific keys (consumo_punta/llano/valle) which map to p1, p2, p3
                 if (window.currentTariffType === '2.0TD' && i <= 3) {
                     kwh = i===1?data.consumo_punta : i===2?data.consumo_llano : i===3?data.consumo_valle : 0;
                 } else {
+                    // For 3.0TD/6.1TD, or universal access
                     kwh = data[`consumo_p${i}`] || 0;
                 }
                 
-                // Get the raw price from the tariff sheet
-                let price = tariff[`p${i}_price`] || 0;
-
-                // --- FIX: SCALING CORRECTION FOR ENERGY PRICES (E1-E6) ---
-                // The user reported an error where the price was read as 159.000000 instead of 0.159000.
-                // If the price is unrealistically high (> 5.0 €/kWh), assume it's a millicents error and scale down.
-                if (price > 5.0) { 
-                    // Example: 159 -> 0.159
-                    price = price / 1000;
-                }
-                // --- END FIX ---
-
+                const price = tariff[`p${i}_price`] || 0;
                 const cost = kwh * price;
                 energyCosts.push({ period: i, cost: cost, price: price, kwh: kwh });
                 subEnergy += cost;
@@ -1256,12 +1294,6 @@
         }
 
         function compareOffers(data) {
-            // FIX: Check if tariffs are loaded before performing the comparison
-            if (window.currentTariffs.length === 0) {
-                window.showErrorModal("No hay tarifas cargadas. Intente recargar la página o verifique la conexión a Internet.", "Error de Datos");
-                return;
-            }
-
             const results = window.currentTariffs.map(t => calculateTariffCost(t, data));
             
             let bestOverall = null;
@@ -1312,7 +1344,6 @@
             if (final.totalAnnual >= currentBill.totalAnnual) {
                  final.isNegativeSavings = true;
                  final.savings = 0;
-                 // Note: totalAnnual is kept as the lowest projected annual cost (which is current bill cost)
                  final.totalAnnual = currentBill.totalAnnual;
                  final.offer = currentBill.offer;
             } else {
@@ -1338,7 +1369,7 @@
             // Set brand for the UI based on final offer/mode
             let brand = BRANDS.DRK;
             if (window.comparisonMode === 'overall_best' && !final.isNegativeSavings) {
-                 // Use POWER CUP branding if it's the overall best (even if it's a non-DRK tariff)
+                // Use POWER CUP branding if it's the overall best (even if it's a non-DRK tariff)
                  brand = BRANDS.POWER_CUP;
             } else if (final.offer && !final.offer.isDrk && !final.isNegativeSavings) {
                  // Use Power Cup branding if the chosen best offer is not a DRK offer
@@ -1620,7 +1651,7 @@
                     <div class="text-center border-b-2 border-dashed border-slate-300 pb-4 mb-4">
                         <h4 class="font-bold text-lg text-slate-800 uppercase">${res.offer.name}</h4>
                         <p>Simulación ${res.dias_facturados} días</p>
-                        <p class="mt-2 text-2xl font-black ${res.savings > 0 ? 'text-green-500' : 'text-slate-500'}">Ahorro: ${eur(res.savings)}</p>
+                        <p class="mt-2 text-2xl font-black text-green-500">Ahorro: ${eur(res.savings)}</p>
                     </div>
                     <!-- POTENCIA -->
                     <div class="mb-4">
@@ -1721,7 +1752,7 @@
                 cupsBreakdownHTML += `
                     <tr class="border-b last:border-b-0">
                         <td class="py-2 font-mono text-xs text-slate-700">${res.cups} (${res.cups_type})</td>
-                        <td class="py-2 text-right font-bold ${res.savings > 0 ? 'text-green-600' : 'text-slate-500'}">${eur(res.savings)}</td>
+                        <td class="py-2 text-right font-bold text-green-600">${eur(res.savings)}</td>
                     </tr>
                 `;
             });
@@ -1774,6 +1805,9 @@
             const commercialCode = document.getElementById('comercial-code-input').value.trim();
             if (!commercialCode) return window.showErrorModal("Indique el Código Comercial.");
 
+            // Save config to firestore before closing modal
+            await saveOfferConfig(); 
+
             try {
                 // 1. Generar el HTML
                 const htmlContent = generateStyledHtmlOffer(commercialCode);
@@ -1812,6 +1846,9 @@
         async function handleCopyMulticupsOffer() {
             const commercialCode = document.getElementById('comercial-code-input').value.trim();
             if (!commercialCode) return window.showErrorModal("Indique el Código Comercial.");
+
+            // Save config to firestore before closing modal
+            await saveOfferConfig(); 
 
             try {
                 const htmlContent = generateStyledMulticupsHtmlOffer(commercialCode);
@@ -1922,21 +1959,21 @@
             }
 
             const emailBody = `Hola ${D_BRAND_NAME.toUpperCase()}, confirmo la aceptación de la oferta con CUPS: ${bd.cups}.${LB}${LB}` +
-                                `--- DATOS DE LA OFERTA ---${LB}${LB}` +
-                                `Comercializadora y Tarifa: ${D_BRAND_NAME.toUpperCase()} - ${offer.name}${LB}` +
-                                `Ahorro Anual Estimado: ${eur(bd.savings)}${LB}` +
-                                `Total Mensual Estimado: ${monthlyEstimate}${LB}` +
-                                `Consumo Total Facturado: ${totalConsumption}${LB}` +
-                                `${discountLine}` + 
-                                `--- DETALLE DE PRECIOS (€) ---${LB}` +
-                                `${priceDetailText}` +
-                                `------------------------------${LB}${LB}` +
-                                `DATOS DEL CLIENTE (A RELLENAR):${LB}` +
-                                `Nombre completo: ${clientName}${LB}` +
-                                `Teléfono de contacto: ${clientPhone}${LB}` +
-                                `Email de contacto: ${clientEmail}${LB}${LB}` +
-                                `INFORMACIÓN ADICIONAL:${LB}` +
-                                `[AGREGUE CUALQUIER COMENTARIO EXTRA AQUÍ]${LB}${LB}`;
+                                 `--- DATOS DE LA OFERTA ---${LB}${LB}` +
+                                 `Comercializadora y Tarifa: ${D_BRAND_NAME.toUpperCase()} - ${offer.name}${LB}` +
+                                 `Ahorro Anual Estimado: ${eur(bd.savings)}${LB}` +
+                                 `Total Mensual Estimado: ${monthlyEstimate}${LB}` +
+                                 `Consumo Total Facturado: ${totalConsumption}${LB}` +
+                                 `${discountLine}` + 
+                                 `--- DETALLE DE PRECIOS (€) ---${LB}` +
+                                 `${priceDetailText}` +
+                                 `------------------------------${LB}${LB}` +
+                                 `DATOS DEL CLIENTE (A RELLENAR):${LB}` +
+                                 `Nombre completo: ${clientName}${LB}` +
+                                 `Teléfono de contacto: ${clientPhone}${LB}` +
+                                 `Email de contacto: ${clientEmail}${LB}${LB}` +
+                                 `INFORMACIÓN ADICIONAL:${LB}` +
+                                 `[AGREGUE CUALQUIER COMENTARIO EXTRA AQUÍ]${LB}${LB}`;
 
             const subject = `FORMALIZACIÓN DE CONTRATO - CUPS: ${bd.cups}`;
             const formalizationRecipients = 'f.araujo@drk.es,r.guerra@drk.es,s.caballero@drk.es'; // Email por defecto
@@ -2264,7 +2301,6 @@
                             </tr>
                             ${preciosRows}
                             ${discountSummaryRow}
-                            <tr style="background-color: #eee; font-weight: bold;"><td style="padding: 8px; color: ${D_PRIMARY_DARK};">AHORRO GLOBAL POR CUPS</td><td style="padding: 8px; text-align: right; font-size: 14px; color: ${GREEN_SAVE}; white-space: nowrap;">${eur(window.multicupsResults.filter(res => res.offer.name === tariffName).reduce((sum, res) => sum + res.savings, 0))}</td></tr>
                             <tr style="background-color: white; height: 5px;"><td colspan="2"></td></tr>
                         </table>
                     </td></tr>
@@ -2409,8 +2445,55 @@
 
         // --- FETCH & PARSE ---
 
+        /**
+         * Lógica de mapeo de encabezados de columna de Google Sheets
+         * a los nombres de campo internos esperados por la aplicación.
+         */
+        function getInternalKey(header, tariffType) {
+            const headerUpper = header.toUpperCase();
+            const isHighVoltage = TARIFF_CONFIG[tariffType]?.isHighVoltage; // True for 3.0TD and 6.1TD
+
+            // Map the column letter to the internal field name
+            const columnMap = {};
+
+            if (isHighVoltage) { // 3.0TD / 6.1TD (Full 6 periods assumed)
+                // Energy Prices (C-H)
+                columnMap['C'] = 'p1_price';
+                columnMap['D'] = 'p2_price';
+                columnMap['E'] = 'p3_price';
+                columnMap['F'] = 'p4_price';
+                columnMap['G'] = 'p5_price';
+                columnMap['H'] = 'p6_price';
+
+                // Power Prices (I-N)
+                columnMap['I'] = 'p_potencia_1';
+                columnMap['J'] = 'p_potencia_2';
+                columnMap['K'] = 'p_potencia_3';
+                columnMap['L'] = 'p_potencia_4';
+                columnMap['M'] = 'p_potencia_5';
+                columnMap['N'] = 'p_potencia_6';
+            } else { // 2.0TD (3 Energy / 2 Power)
+                // Energy Prices (C-E)
+                columnMap['C'] = 'p1_price';
+                columnMap['D'] = 'p2_price';
+                columnMap['E'] = 'p3_price';
+
+                // Power Prices (F-G)
+                columnMap['F'] = 'p_potencia_1';
+                columnMap['G'] = 'p_potencia_2';
+            }
+            
+            // Check if the header is a known column letter in the map
+            if (columnMap[headerUpper]) {
+                return columnMap[headerUpper];
+            }
+            
+            // Fallback: Use the header name directly for metadata fields (name, description, isdrk, descuento, etc.)
+            return header.toLowerCase();
+        }
+
         window.fetchTariffsFromSheet = async () => {
-            // REMOVED: if (!isAuthReady) return; (Tariff fetching is independent of Firebase auth)
+            if (!isAuthReady) return;
 
             const statusEl = document.getElementById('loading-status');
             statusEl.textContent = `Cargando tarifas ${window.currentTariffType}...`;
@@ -2421,83 +2504,74 @@
             const url = `https://docs.google.com/spreadsheets/d/${sheetId}/gviz/tq?tqx=out:csv&gid=0&t=${Date.now()}`;
 
             try {
-                // Implementing retry logic for robustness against transient network/server issues
-                let response = null;
-                let attempts = 1;
-                const maxAttempts = 3;
-                
-                while (attempts <= maxAttempts) {
-                    try {
-                        response = await fetch(url);
-                        if (response.ok) break;
-                    } catch (e) {
-                        console.warn(`Intento ${attempts} fallido: ${e.message}`);
-                    }
-
-                    if (attempts < maxAttempts) {
-                        await new Promise(resolve => setTimeout(resolve, 1000 * (2 ** attempts))); // Exponential backoff
-                    }
-                    attempts++;
-                }
-
-                if (!response || !response.ok) throw new Error(`Error red: HTTP ${response?.status || 'Fallo de conexión'}`);
-                
+                const response = await fetch(url);
+                if (!response.ok) throw new Error("Error red");
                 const text = await response.text();
                 window.currentTariffs = parseCSV(text);
                 
                 document.getElementById('tariff-display-badge').textContent = window.currentTariffs.length;
                 statusEl.classList.add('hidden');
                 
-                if(window.currentTariffs.length === 0) window.showErrorModal("No se encontraron tarifas válidas en la hoja de cálculo. Por favor, revise la configuración.", "Error de Datos");
+                if(window.currentTariffs.length === 0) window.showErrorModal("No se encontraron tarifas en la hoja.");
                 
             } catch (e) {
                 console.error(e);
                 statusEl.textContent = "Error cargando tarifas.";
-                window.showErrorModal(`Error de conexión con Google Sheets: ${e.message}. El comparador no podrá funcionar sin tarifas.`, "Error de Carga Crítico");
+                window.showErrorModal("Error de conexión con Google Sheets.");
             }
         }
 
         function parseCSV(text) {
-            // FIX: Simplified and fixed the CSV parsing logic to reliably use the detected delimiter 
-            // and correctly handle Spanish number format (comma as decimal).
-            const lines = text.trim().split('\n');
-            if (lines.length < 2) return [];
-            
-            const rawHeader = lines[0].trim().replace(/^"|"$/g, '');
-            // Determine delimiter based on the header line
-            const delimiter = rawHeader.includes(';') ? ';' : ',';
-            
-            const headers = rawHeader.split(delimiter).map(h => h.trim().toLowerCase().replace(/"/g, ''));
-            const data = [];
+             const lines = text.trim().split('\n');
+             if (lines.length < 2) return [];
+             
+             const rawHeader = lines[0];
+             const delimiter = rawHeader.includes(';') ? ';' : ',';
+             
+             // Headers here should be column letters/names (e.g., "A", "B", "C" or "Name", "Description")
+             const headers = rawHeader.split(delimiter).map(h => h.trim().replace(/"/g, ''));
+             const data = [];
 
-            for(let i=1; i<lines.length; i++) {
-                const row = lines[i].trim();
-                if(!row) continue;
-                
-                // Use the detected delimiter to split the row reliably. This relies on GDocs properly quoting fields with the delimiter inside.
-                // Simple split and trim/clean quotes
-                const values = row.split(delimiter).map(v => v.replace(/^"|"$/g, '').replace(/""/g, '"').trim());
+             for(let i=1; i<lines.length; i++) {
+                 const row = lines[i].trim();
+                 if(!row) continue;
+                 
+                 const regex = new RegExp(`(?:^|${delimiter})(\"(?:[^\"]|\"\")*\"|[^${delimiter}]*)`,"g");
+                 const values = [];
+                 let match = null;
+                 let startIndex = 0;
+                 // Custom parsing loop to handle CSV rows with embedded commas/semicolons inside quotes
+                 while (startIndex < row.length) {
+                     const match = row.substring(startIndex).match(/^((?:"(?:[^"]|\\")*"|[^,;\n]*))[,;]?/);
+                     if (!match) break;
+                     let val = match[1].replace(/^"|"$/g, '').replace(/""/g, '"').trim();
+                     values.push(val);
+                     startIndex += match[0].length;
+                 }
 
 
-                if(values.length < headers.length) continue; 
+                 if(values.length < 2) continue;
 
-                let item = { cups_match: [window.currentTariffType] };
-                headers.forEach((h, idx) => {
-                    let val = values[idx];
-                    if (h.includes('price') || h.includes('potencia') || h === 'descuento') {
-                        // Handling comma as decimal separator in Spanish/European context
-                        val = parseFloat(val?.replace(',', '.') || 0);
-                        if(isNaN(val)) val = 0;
-                    }
-                    item[h] = val;
-                });
+                 let item = { cups_match: [currentTariffType] };
+                 headers.forEach((h, idx) => {
+                     let val = values[idx];
+                     // Use the mapping logic to get the correct internal key name
+                     const internalKey = getInternalKey(h, window.currentTariffType); 
 
-                item.isDrk = item.name?.toUpperCase().includes('DRK');
-                
-                // Only push items that seem to have price data to ensure validity
-                if (item.p1_price !== undefined) data.push(item);
-            }
-            return data;
+                     if (internalKey.includes('price') || internalKey.includes('potencia') || internalKey === 'descuento') {
+                         // Handling comma as decimal separator in Spanish/European context
+                         val = parseFloat(val?.replace(',', '.') || 0);
+                         if(isNaN(val)) val = 0;
+                     }
+                     item[internalKey] = val;
+                 });
+
+                 item.isDrk = item.name?.toUpperCase().includes('DRK');
+                 
+                 // Only push items that seem to have price data to ensure validity
+                 if(item.p1_price !== undefined) data.push(item);
+             }
+             return data;
         }
         // --- FIN FETCH & PARSE ---
 
@@ -2778,13 +2852,7 @@
             navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } }).then(s => {
                 stream = s; video.srcObject = s;
                 video.onloadedmetadata = () => { video.play(); scanLoop(); };
-            }).catch(e => { 
-                console.error(e); 
-                stopScanner(); 
-                window.resetToLanding(); 
-                // Enhanced Error Message for external use
-                window.showErrorModal("Error al acceder a la cámara. La mayoría de los navegadores requieren una conexión segura (HTTPS) para el escaneo en vivo. Por favor, use 'Opciones QR Manual' o 'Datos a Mano'."); 
-            });
+            }).catch(e => { console.error(e); stopScanner(); window.resetToLanding(); window.showErrorModal("Error al acceder a la cámara. Intente subir una imagen."); });
         }
         function scanLoop() {
             if (!scannerRunning || !video || video.readyState !== video.HAVE_ENOUGH_DATA) { animationFrameId = requestAnimationFrame(scanLoop); return; }
@@ -2866,6 +2934,13 @@
             document.querySelectorAll('input[name="comparison_mode"]').forEach(r => {
                 r.addEventListener('change', (e) => updateComparisonMode(e.target.value));
             });
+            
+            // Add listeners to save offer config immediately when changed
+            document.getElementById('comercial-code-input').addEventListener('change', saveOfferConfig);
+            document.getElementById('client-name-input').addEventListener('change', saveOfferConfig);
+            document.getElementById('client-phone-input').addEventListener('change', saveOfferConfig);
+            document.getElementById('client-email-input').addEventListener('change', saveOfferConfig);
+
 
             // Disparar evento de cambio inicial para aplicar el branding (esto corrige la carga inicial)
             const initialModeInput = document.querySelector('input[name="comparison_mode"]:checked');
@@ -2873,11 +2948,10 @@
                 updateComparisonMode(initialModeInput.value);
             }
 
-            // CRITICAL FIX: Load tariffs immediately, regardless of Firebase auth success.
-            window.fetchTariffsFromSheet();
-
-            // Try to initiate Firebase for Multicups persistence (will fail gracefully outside Canvas)
-            initFirebase(); 
+            // Iniciar Firebase (se encarga de cargar tarifas y data multicups)
+            document.getElementById('loading-status').textContent = `Conectando a DRK Cloud...`;
+            document.getElementById('loading-status').classList.remove('hidden');
+            initFirebase();
         });
     </script>
 </body>
