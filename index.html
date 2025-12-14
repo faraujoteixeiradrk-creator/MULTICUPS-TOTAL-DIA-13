@@ -560,7 +560,7 @@
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
         import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
         import { getFirestore, doc, setDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
-        import { setLogLevel } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+        // import { setLogLevel } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js"; // Not used to avoid polluting console by default
 
         // Global Firebase variables
         let db = null;
@@ -615,7 +615,8 @@
             const path = `artifacts/${appId}/users/${userId}/user_data`;
             const docRef = doc(db, path, 'offer_config');
 
-            const unsubscribe = onSnapshot(docRef, (docSnap) => {
+            // Set up listener, but don't hold the unsubscribe handle globally unless necessary
+            onSnapshot(docRef, (docSnap) => {
                 if (docSnap.exists()) {
                     const data = docSnap.data();
                     document.getElementById('comercial-code-input').value = data.commercialCode || '';
@@ -627,7 +628,6 @@
             }, (error) => {
                 console.error("Firestore Offer Config Listener error:", error);
             });
-            // return unsubscribe;
         }
 
         /**
@@ -669,9 +669,10 @@
             const docRef = doc(db, path, 'results');
 
             // onSnapshot listener to update UI on local/remote changes
-            const unsubscribe = onSnapshot(docRef, (docSnap) => {
-                if (docSnap.exists() && docSnap.data().results && docSnap.data().results.length > 0) {
-                    const loadedResults = docSnap.data().results;
+            onSnapshot(docRef, (docSnap) => {
+                const loadedResults = docSnap.exists() && docSnap.data().results ? docSnap.data().results : [];
+
+                if (loadedResults.length > 0) {
                     window.multicupsResults = loadedResults;
                     window.isMulticupsMode = true; // Activate mode on load
                     
@@ -685,8 +686,8 @@
                     btn.classList.add('bg-drk-500', 'hover:bg-drk-600', 'text-white', 'shadow-lg');
                     btn.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd" /></svg>Multicups (Activo: ${loadedResults.length})`;
 
-                } else if (window.multicupsResults && window.multicupsResults.length > 0) {
-                    // This handles when the local data is cleared and the snapshot is empty/deleted
+                } else if (window.multicupsResults.length > 0) {
+                    // This handles when the remote data is empty/deleted
                     window.multicupsResults = [];
                     window.isMulticupsMode = false;
                     document.getElementById('loading-status').textContent = `Estudios Multicups limpiados.`;
@@ -695,13 +696,16 @@
                     if(document.getElementById('multicups-summary-view').classList.contains('flex')) {
                         window.resetToLanding();
                     }
+                    // Reset Multicups Button UI to inactive state
+                    const btn = document.getElementById('multicups-mode-btn');
+                    btn.classList.add('bg-slate-100', 'text-slate-700', 'hover:bg-slate-200');
+                    btn.classList.remove('bg-drk-500', 'hover:bg-drk-600', 'text-white', 'shadow-lg');
+                    btn.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-11a1 1 0 10-2 0v2H7a1 1 0 100 2h2v2a1 1 0 102 0v-2h2a1 1 0 100-2h-2V7z" clip-rule="evenodd" /></svg>Multicups`;
                 }
             }, (error) => {
                 console.error("Firestore Listener error:", error);
                 window.showErrorModal("Error al sincronizar datos de Multicups. Revise la conexión.");
             });
-            
-            // return unsubscribe; // Keep for eventual cleanup if needed in a multi-component app
         }
 
         async function initFirebase() {
@@ -725,7 +729,7 @@
                         userId = user.uid;
                         isAuthReady = true;
                         console.log("Firebase initialized. User ID:", userId);
-                        document.getElementById('loading-status').textContent = `App lista. Usuario: ${userId}`;
+                        document.getElementById('loading-status').textContent = `App lista. Usuario: ${userId.substring(0, 8)}...`;
                         setTimeout(() => document.getElementById('loading-status').classList.add('hidden'), 2000);
                         
                         // Load persistent data once authentication is complete
@@ -1183,7 +1187,7 @@
             const qrContainer = document.getElementById('qr-code-container');
             const qrVisualContainer = document.getElementById('qr-visual-container');
 
-            const fullUrl = `${brand.QR_URL}?tariff=${window.currentTariffType}`; 
+            const fullUrl = `${EXTERNAL_APP_URL}?tariff=${window.currentTariffType}`; 
 
             qrContainer.innerHTML = '';
             window.qrCodeInstance = null;
@@ -1786,7 +1790,9 @@
                         <div class="${cardBg} p-4 font-bold text-lg ${cardText} border-b border-powercup-200">
                             Estudio #${index + 1}: ${res.cups} (${res.cups_type}) - Tarifa: ${res.offer.name}
                         </div>
-                        ${singleBreakdownHTML}
+                        <div class="p-6">
+                           ${singleBreakdownHTML}
+                        </div>
                     </div>
                 `;
             });
@@ -1941,7 +1947,7 @@
             // --- CUERPO DEL EMAIL (Texto plano: para el mailto:) ---
             const LB = '%0A'; // URL-encoded newline
             
-            const config = TARIFF_CONFIG[bd.cups_type];
+            const config = TARIFF_CONFIG[window.currentTariffType];
 
             const monthlyEstimate = eur(bd.totalAnnual / 12);
             const totalConsumption = num(bd.energyCosts.reduce((sum, e) => sum + e.kwh, 0), 0) + ' kWh';
@@ -1959,20 +1965,20 @@
             }
 
             const emailBody = `Hola ${D_BRAND_NAME.toUpperCase()}, confirmo la aceptación de la oferta con CUPS: ${bd.cups}.${LB}${LB}` +
-                                 `--- DATOS DE LA OFERTA ---${LB}${LB}` +
-                                 `Comercializadora y Tarifa: ${D_BRAND_NAME.toUpperCase()} - ${offer.name}${LB}` +
-                                 `Ahorro Anual Estimado: ${eur(bd.savings)}${LB}` +
-                                 `Total Mensual Estimado: ${monthlyEstimate}${LB}` +
-                                 `${discountLine}` + 
-                                 `--- DETALLE DE PRECIOS (€) ---${LB}` +
-                                 `${priceDetailText}` +
-                                 `------------------------------${LB}${LB}` +
-                                 `DATOS DEL CLIENTE (A RELLENAR):${LB}` +
-                                 `Nombre completo: ${clientName}${LB}` +
-                                 `Teléfono de contacto: ${clientPhone}${LB}` +
-                                 `Email de contacto: ${clientEmail}${LB}${LB}` +
-                                 `INFORMACIÓN ADICIONAL:${LB}` +
-                                 `[AGREGUE CUALQUIER COMENTARIO EXTRA AQUÍ]${LB}${LB}`;
+                                `--- DATOS DE LA OFERTA ---${LB}${LB}` +
+                                `Comercializadora y Tarifa: ${D_BRAND_NAME.toUpperCase()} - ${offer.name}${LB}` +
+                                `Ahorro Anual Estimado: ${eur(bd.savings)}${LB}` +
+                                `Total Mensual Estimado: ${monthlyEstimate}${LB}` +
+                                `${discountLine}` + 
+                                `--- DETALLE DE PRECIOS (€) ---${LB}` +
+                                `${priceDetailText}` +
+                                `------------------------------${LB}${LB}` +
+                                `DATOS DEL CLIENTE (A RELLENAR):${LB}` +
+                                `Nombre completo: ${clientName}${LB}` +
+                                `Teléfono de contacto: ${clientPhone}${LB}` +
+                                `Email de contacto: ${clientEmail}${LB}${LB}` +
+                                `INFORMACIÓN ADICIONAL:${LB}` +
+                                `[AGREGUE CUALQUIER COMENTARIO EXTRA AQUÍ]${LB}${LB}`;
 
             const subject = `FORMALIZACIÓN DE CONTRATO - CUPS: ${bd.cups}`;
             const formalizationRecipients = 'f.araujo@drk.es,r.guerra@drk.es,s.caballero@drk.es'; // Email por defecto
