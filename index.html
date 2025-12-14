@@ -2529,7 +2529,8 @@
         }
 
         /**
-         * FIX CRÍTICO: Nueva función de parsing de CSV más robusta para manejar delimitadores y valores.
+         * FIX CRÍTICO: Nueva función de parsing de CSV más robusta para manejar delimitadores y valores,
+         * especialmente con el formato de número europeo (coma como decimal, punto como miles).
          */
         function parseCSV(text) {
              const lines = text.trim().split('\n');
@@ -2539,7 +2540,7 @@
              // Detect delimiter: prioritize semicolon, then comma
              const delimiter = rawHeader.includes(';') ? ';' : ',';
 
-             // 1. Clean and map headers
+             // Clean and map headers
              const headers = rawHeader.split(delimiter).map(h => h.trim().replace(/^"|"$/g, '').replace(/""/g, '"'));
              const data = [];
              const tariffType = window.currentTariffType;
@@ -2548,29 +2549,13 @@
                  const row = lines[i].trim();
                  if (!row) continue;
 
-                 // Use regex for a more robust split that handles quotes, necessary for Sheets CSV exports
-                 let values;
-                 try {
-                     // Regex: Match either quoted string (excluding delimiters inside) OR non-delimiter sequence, followed by lookahead for delimiter or end of line.
-                     // It is complex, but often necessary for mixed CSV formats from sheets.
-                     const matches = row.match(/("([^"]|""|\\")*"|[^",;\n]*)([;,]|$)/g);
-                     if (!matches) continue;
-                     
-                     values = matches.map(match => {
-                         // Remove trailing delimiter and quotes
-                         let val = match.replace(/[;,]$/, '');
-                         return val.replace(/^"|"$/g, '').replace(/""/g, '"').trim();
-                     });
-                 } catch (e) {
-                     // Fallback to simple split if regex fails (shouldn't happen on well-formed CSV)
-                     values = row.split(delimiter).map(v => v.trim().replace(/^"|"$/g, '').replace(/""/g, '"'));
-                 }
-                 
+                 // Simple split should work reliably from the /gviz/tq CSV endpoint.
+                 let values = row.split(delimiter).map(v => v.trim().replace(/^"|"$/g, '').replace(/""/g, '"'));
+
                  // Handle missing trailing values (empty columns)
                  while (values.length < headers.length) {
-                    values.push('');
+                     values.push('');
                  }
-
 
                  let item = { cups_match: [tariffType] };
                  headers.forEach((h, idx) => {
@@ -2580,8 +2565,15 @@
                      const internalKey = getInternalKey(h, tariffType);
 
                      if (internalKey.includes('price') || internalKey.includes('potencia') || internalKey === 'descuento') {
-                         // Handling comma as decimal separator in Spanish/European context
-                         val = parseFloat(val?.replace(',', '.') || 0);
+                         // === CRITICAL FIX: Robust parsing for Spanish/European number format ===
+                         // 1. Remove thousands separators (dots)
+                         let cleanedVal = val.replace(/\./g, '');
+                         // 2. Replace the decimal comma with a decimal dot
+                         cleanedVal = cleanedVal.replace(',', '.');
+                         
+                         val = parseFloat(cleanedVal || 0);
+                         // ====================================================================
+
                          if (isNaN(val)) val = 0;
                      } else if (internalKey.includes('isdrk') || internalKey.includes('islider')) {
                          // Convert text flags to boolean
@@ -2700,9 +2692,9 @@
                 
                 // Asegurar que el logo DRK no tiene clases de formato multilínea si se re-activa.
                 if (input.value !== 'overall_best') {
-                     // Solo para DRK Únicamente y DRK Prioritario
-                     label.classList.remove('p-1', 'text-center');
-                     label.classList.add('px-2', 'py-2');
+                      // Solo para DRK Únicamente y DRK Prioritario
+                      label.classList.remove('p-1', 'text-center');
+                      label.classList.add('px-2', 'py-2');
                 }
             });
         }
