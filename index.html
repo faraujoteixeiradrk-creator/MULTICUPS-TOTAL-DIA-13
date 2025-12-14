@@ -1373,14 +1373,14 @@
             // Set brand for the UI based on final offer/mode
             let brand = BRANDS.DRK;
             if (window.comparisonMode === 'overall_best' && !final.isNegativeSavings) {
-                 // Use POWER CUP branding if it's the overall best (even if it's a non-DRK tariff)
-                 brand = BRANDS.POWER_CUP;
+                // Use POWER CUP branding if it's the overall best (even if it's a non-DRK tariff)
+                brand = BRANDS.POWER_CUP;
             } else if (final.offer && !final.offer.isDrk && !final.isNegativeSavings) {
-                 // Use Power Cup branding if the chosen best offer is not a DRK offer
-                 brand = BRANDS.POWER_CUP;
+                // Use Power Cup branding if the chosen best offer is not a DRK offer
+                brand = BRANDS.POWER_CUP;
             } else {
-                 // Default to DRK branding (DRK offer or no savings/current plan)
-                 brand = BRANDS.DRK;
+                // Default to DRK branding (DRK offer or no savings/current plan)
+                brand = BRANDS.DRK;
             }
 
             applyBrandStyles(brand);
@@ -1791,7 +1791,7 @@
                             Estudio #${index + 1}: ${res.cups} (${res.cups_type}) - Tarifa: ${res.offer.name}
                         </div>
                         <div class="p-6">
-                           ${singleBreakdownHTML}
+                            ${singleBreakdownHTML}
                         </div>
                     </div>
                 `;
@@ -2029,7 +2029,7 @@
 
             // Desglose: Potencia
             let desglosePotencia = bd.powerCosts.map(p => {
-                if (p.kw > 0 || currentTariffType === '2.0TD' && p.period <= 2) {
+                if (p.kw > 0 || window.currentTariffType === '2.0TD' && p.period <= 2) {
                     return `<tr><td style="${rowLabel} font-family: monospace; font-size: 12px;">P${p.period} (${num(p.kw,2)} kW x ${bd.dias_facturados}d x ${numPriceFormula(p.priceDay)})</td><td style="${rowValue} font-family: monospace; font-size: 12px; white-space: nowrap;">${num(p.cost, 2)} €</td></tr>`;
                 }
                 return '';
@@ -2037,7 +2037,7 @@
             
             // Desglose: Energía
             let desgloseEnergia = bd.energyCosts.map(e => {
-                if (e.kwh > 0 || currentTariffType === '2.0TD' && e.period <= 3) {
+                if (e.kwh > 0 || window.currentTariffType === '2.0TD' && e.period <= 3) {
                     return `<tr><td style="${rowLabel} font-family: monospace; font-size: 12px;">E${e.period} (${num(e.kwh,0)} kWh x ${numPriceFormula(e.price)})</td><td style="${rowValue} font-family: monospace; font-size: 12px; white-space: nowrap;">${num(e.cost, 2)} €</td></tr>`;
                 }
                 return '';
@@ -2524,70 +2524,74 @@
                 console.error("Error al cargar tarifas:", e);
                 statusEl.textContent = "Error cargando tarifas.";
                 setTimeout(() => statusEl.classList.add('hidden'), 5000); // Hide slower on error
-                window.showErrorModal("Error crítico de conexión con Google Sheets. Si el problema persiste, verifique que la hoja esté compartida como 'Cualquier persona con el enlace' y que su proveedor de hosting no tenga un bloqueo de CSP/CORS.");
+                window.showErrorModal("Error crítico de conexión con Google Sheets. Si el problema persiste, verifique que la hoja esté compartida como 'Cualquier persona con el enlace'.");
             }
         }
 
+        /**
+         * FIX CRÍTICO: Nueva función de parsing de CSV más robusta para manejar delimitadores y valores.
+         */
         function parseCSV(text) {
              const lines = text.trim().split('\n');
              if (lines.length < 2) return [];
-             
-             const rawHeader = lines[0];
-             const delimiter = rawHeader.includes(';') ? ';' : ',';
-             
-             // Headers here should be column letters/names (e.g., "A", "B", "C" or "Name", "Description")
-             const headers = rawHeader.split(delimiter).map(h => h.trim().replace(/"/g, ''));
-             const data = [];
 
-             for(let i=1; i<lines.length; i++) {
+             const rawHeader = lines[0];
+             // Detect delimiter: prioritize semicolon, then comma
+             const delimiter = rawHeader.includes(';') ? ';' : ',';
+
+             // 1. Clean and map headers
+             const headers = rawHeader.split(delimiter).map(h => h.trim().replace(/^"|"$/g, '').replace(/""/g, '"'));
+             const data = [];
+             const tariffType = window.currentTariffType;
+
+             for (let i = 1; i < lines.length; i++) {
                  const row = lines[i].trim();
-                 if(!row) continue;
+                 if (!row) continue;
+
+                 // Use regex for a more robust split that handles quotes, necessary for Sheets CSV exports
+                 let values;
+                 try {
+                     // Regex: Match either quoted string (excluding delimiters inside) OR non-delimiter sequence, followed by lookahead for delimiter or end of line.
+                     // It is complex, but often necessary for mixed CSV formats from sheets.
+                     const matches = row.match(/("([^"]|""|\\")*"|[^",;\n]*)([;,]|$)/g);
+                     if (!matches) continue;
+                     
+                     values = matches.map(match => {
+                         // Remove trailing delimiter and quotes
+                         let val = match.replace(/[;,]$/, '');
+                         return val.replace(/^"|"$/g, '').replace(/""/g, '"').trim();
+                     });
+                 } catch (e) {
+                     // Fallback to simple split if regex fails (shouldn't happen on well-formed CSV)
+                     values = row.split(delimiter).map(v => v.trim().replace(/^"|"$/g, '').replace(/""/g, '"'));
+                 }
                  
-                 const values = [];
-                 let startIndex = 0;
-                 // Custom parsing loop to handle CSV rows with embedded commas/semicolons inside quotes
-                 while (startIndex < row.length) {
-                      // Regex to capture quoted strings or non-delimiter characters followed by a delimiter or end of line
-                      const match = row.substring(startIndex).match(/^((?:"(?:[^"]|\\")*"|[^,;\n]*))[,;]?/);
-                      if (!match) {
-                          // Handle trailing empty columns if the line ends with a delimiter
-                          if (row.substring(startIndex).match(/^[;,]/)) {
-                              values.push('');
-                              startIndex++; // Move past the delimiter
-                              continue;
-                          }
-                          break;
-                      }
-                      let val = match[1].replace(/^"|"$/g, '').replace(/""/g, '"').trim();
-                      values.push(val);
-                      startIndex += match[0].length;
+                 // Handle missing trailing values (empty columns)
+                 while (values.length < headers.length) {
+                    values.push('');
                  }
 
 
-                 if(values.length < 2) continue;
-
-                 let item = { cups_match: [currentTariffType] };
+                 let item = { cups_match: [tariffType] };
                  headers.forEach((h, idx) => {
-                      if (idx >= values.length) {
-                          // Ensure we don't access out-of-bounds index
-                          return;
-                      }
-                      let val = values[idx];
-                      // Use the mapping logic to get the correct internal key name
-                      const internalKey = getInternalKey(h, window.currentTariffType); 
+                     if (idx >= values.length) return;
 
-                      if (internalKey.includes('price') || internalKey.includes('potencia') || internalKey === 'descuento') {
-                           // Handling comma as decimal separator in Spanish/European context
-                           val = parseFloat(val?.replace(',', '.') || 0);
-                           if(isNaN(val)) val = 0;
-                         }
-                         item[internalKey] = val;
-                      });
+                     let val = values[idx];
+                     const internalKey = getInternalKey(h, tariffType);
 
-                    item.isDrk = item.name?.toUpperCase().includes('DRK');
-                    
-                    // Only push items that seem to have price data to ensure validity
-                    if(item.p1_price !== undefined) data.push(item);
+                     if (internalKey.includes('price') || internalKey.includes('potencia') || internalKey === 'descuento') {
+                         // Handling comma as decimal separator in Spanish/European context
+                         val = parseFloat(val?.replace(',', '.') || 0);
+                         if (isNaN(val)) val = 0;
+                     } else if (internalKey.includes('isdrk') || internalKey.includes('islider')) {
+                         // Convert text flags to boolean
+                         val = (val.toLowerCase() === 'true' || val === '1' || val.toLowerCase() === 'si');
+                     }
+                     item[internalKey] = val;
+                 });
+
+                 item.isDrk = item.name?.toUpperCase().includes('DRK');
+                 if (item.p1_price !== undefined) data.push(item);
              }
              return data;
         }
@@ -2924,10 +2928,12 @@
             };
             
             // Botón para subir imagen
-            document.getElementById('modal-upload-file-btn').addEventListener('click', () => document.getElementById('image-file-input').click());
-            document.getElementById('image-file-input').addEventListener('change', (e) => {
+            document.getElementById('modal-upload-file-btn').addEventListener('click', () => {
                 document.getElementById('qr-options-modal').classList.add('hidden');
                 document.getElementById('qr-options-modal').classList.remove('flex');
+                document.getElementById('image-file-input').click();
+            });
+            document.getElementById('image-file-input').addEventListener('change', (e) => {
                 if (e.target.files[0]) decodeQRFromImage(e.target.files[0]);
                 e.target.value = '';
             });
