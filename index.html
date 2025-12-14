@@ -388,7 +388,8 @@
                 <div id="result-header" class="bg-gradient-to-r from-drk-800 to-drk-600 p-6 text-white text-center relative overflow-hidden">
                     <p class="uppercase tracking-widest text-xs font-semibold text-drk-100 mb-1" id="best-offer-label">LA MEJOR OPCIÓN PARA TI ES</p>
                     <h2 id="best-offer-name" class="text-2xl md:text-3xl font-extrabold leading-tight mb-2">Nombre Tarifa</h2>
-                    <p id="best-offer-desc" class="text-drk-100 text-sm opacity-90">Descripción</p>
+                    <!-- offer.description del CSV -->
+                    <p id="best-offer-desc" class="text-drk-100 text-sm opacity-90">Descripción</p> 
                 </div>
                 <div class="p-6">
                     <div class="flex flex-col gap-6">
@@ -549,6 +550,7 @@
 
     <script>
         // CONFIGURACIÓN DE TIPO DE TARIFAS
+        // **ATENCIÓN: Los IDs de las hojas deben ser públicos para funcionar (CSV)**
         const TARIFF_CONFIG = {
             '2.0TD': { sheetId: '19CBiWVvxHoWW0fqdbSbLGs-hoISQGORAfebBztFYi3w', periods: 3, powerPeriods: 2, label: '2.0 TD', isHighVoltage: false, requiresQR: true, isMulti: false },
             '3.0TD': { sheetId: '18nieA7yMD9Ytc2Z3EnktoNDZokuMrBet_ETGyhNZDuo', periods: 6, powerPeriods: 6, label: '3.0 TD', isHighVoltage: true, requiresQR: false, isMulti: false },
@@ -790,7 +792,7 @@
                 if (!isDrk && currentTariffType !== 'MULTICUPS') { // POWER CUP active and NOT MultiCups mode
                     manualInputBtn.classList.add('w-full', 'bg-powercup-500', 'hover:bg-powercup-600', 'text-white', 'font-bold', 'py-3', 'px-6', 'rounded-xl', 'shadow-sm', 'transform', 'transition', 'active:scale-95', 'flex', 'items-center', 'justify-center', 'gap-3');
                 } else { // DRK active or MultiCups mode (uses DRK secondary style)
-                     manualInputBtn.classList.add('w-full', 'font-bold', 'py-3', 'px-6', 'rounded-xl', 'shadow-sm', 'transform', 'transition', 'active:scale-95', 'flex', 'items-center', 'justify-center', 'gap-3', ...brand.SECONDARY_BUTTON_BG.split(' '), ...brand.SECONDARY_BUTTON_TEXT.split(' '));
+                    manualInputBtn.classList.add('w-full', 'font-bold', 'py-3', 'px-6', 'rounded-xl', 'shadow-sm', 'transform', 'transition', 'active:scale-95', 'flex', 'items-center', 'justify-center', 'gap-3', ...brand.SECONDARY_BUTTON_BG.split(' '), ...brand.SECONDARY_BUTTON_TEXT.split(' '));
                 }
                 // Re-add mt-3 if QR buttons are visible
                 if (!document.getElementById('qr-buttons-container')?.classList.contains('hidden')) {
@@ -1178,9 +1180,9 @@
             } else if (comparisonMode === 'drk_prioritized') {
                  // DRK PRIORITARIO: Usar la mejor DRK si ofrece ahorro (>0). Si no ofrece ahorro, usar la mejor overall.
                  if (bestDrk && bestDrk.totalAnnual < bestDrk.originalBillAnnual) {
-                     final = bestDrk;
+                      final = bestDrk;
                  } else {
-                     final = bestOverall;
+                      final = bestOverall;
                  }
             } // If comparisonMode === 'overall_best', final = bestOverall (which is what we set initially)
             
@@ -1809,7 +1811,7 @@
                  if (p.kw > 0 || p.period <= config.powerPeriods) {
                       powerBreakdown += `<div class="flex justify-between"><span>P${p.period} (${num(p.kw, 2)} kW x ${numPriceFormula(p.priceDay)} €/día)</span><span>${num(p.cost, 2)} €</span></div>`;
                  }
-             });
+               });
                 
             let energyBreakdown = '';
             res.energyCosts.forEach(e => {
@@ -2802,10 +2804,12 @@
             if (currentTariffType === 'MULTICUPS') {
                 selectEl.innerHTML = `<option value="2.0TD">2.0 TD (Punta, Llano, Valle)</option><option value="3.0TD">3.0 TD (6 Periodos - Se mapearán E1/E2/E3)</option>`;
                 selectEl.value = '2.0TD'; // Asumimos 2.0TD ya que el QR solo trae 3 periodos
+                modal.querySelector('h3').textContent = `Confirmar Suministro MultiCups`; // NEW: Adjust title for MultiCups
             } else {
                  // Modo Individual, solo opciones completas
                  selectEl.innerHTML = `<option value="2.0TD">2.0 TD (Punta, Llano, Valle)</option><option value="3.0TD">3.0 TD (6 Periodos)</option>`;
                  selectEl.value = data.originalTariffType;  
+                 modal.querySelector('h3').textContent = `Confirmar Suministro`; // Reset title for Individual
             }
 
             summaryEl.innerHTML = `
@@ -2922,9 +2926,9 @@
                  finalIndividualResult = bestDrk || bestOverall;
             } else if (comparisonMode === 'drk_prioritized') {
                  if (bestDrk && bestDrk.totalAnnual < bestDrk.originalBillAnnual) {
-                     finalIndividualResult = bestDrk;
+                      finalIndividualResult = bestDrk;
                  } else {
-                     finalIndividualResult = bestOverall; 
+                      finalIndividualResult = bestOverall;  
                  }
             } // If comparisonMode === 'overall_best', finalIndividualResult remains bestOverall.
 
