@@ -1959,20 +1959,20 @@
             }
 
             const emailBody = `Hola ${D_BRAND_NAME.toUpperCase()}, confirmo la aceptación de la oferta con CUPS: ${bd.cups}.${LB}${LB}` +
-                                `--- DATOS DE LA OFERTA ---${LB}${LB}` +
-                                `Comercializadora y Tarifa: ${D_BRAND_NAME.toUpperCase()} - ${offer.name}${LB}` +
-                                `Ahorro Anual Estimado: ${eur(bd.savings)}${LB}` +
-                                `Total Mensual Estimado: ${monthlyEstimate}${LB}` +
-                                `${discountLine}` + 
-                                `--- DETALLE DE PRECIOS (€) ---${LB}` +
-                                `${priceDetailText}` +
-                                `------------------------------${LB}${LB}` +
-                                `DATOS DEL CLIENTE (A RELLENAR):${LB}` +
-                                `Nombre completo: ${clientName}${LB}` +
-                                `Teléfono de contacto: ${clientPhone}${LB}` +
-                                `Email de contacto: ${clientEmail}${LB}${LB}` +
-                                `INFORMACIÓN ADICIONAL:${LB}` +
-                                `[AGREGUE CUALQUIER COMENTARIO EXTRA AQUÍ]${LB}${LB}`;
+                                 `--- DATOS DE LA OFERTA ---${LB}${LB}` +
+                                 `Comercializadora y Tarifa: ${D_BRAND_NAME.toUpperCase()} - ${offer.name}${LB}` +
+                                 `Ahorro Anual Estimado: ${eur(bd.savings)}${LB}` +
+                                 `Total Mensual Estimado: ${monthlyEstimate}${LB}` +
+                                 `${discountLine}` + 
+                                 `--- DETALLE DE PRECIOS (€) ---${LB}` +
+                                 `${priceDetailText}` +
+                                 `------------------------------${LB}${LB}` +
+                                 `DATOS DEL CLIENTE (A RELLENAR):${LB}` +
+                                 `Nombre completo: ${clientName}${LB}` +
+                                 `Teléfono de contacto: ${clientPhone}${LB}` +
+                                 `Email de contacto: ${clientEmail}${LB}${LB}` +
+                                 `INFORMACIÓN ADICIONAL:${LB}` +
+                                 `[AGREGUE CUALQUIER COMENTARIO EXTRA AQUÍ]${LB}${LB}`;
 
             const subject = `FORMALIZACIÓN DE CONTRATO - CUPS: ${bd.cups}`;
             const formalizationRecipients = 'f.araujo@drk.es,r.guerra@drk.es,s.caballero@drk.es'; // Email por defecto
@@ -2575,14 +2575,14 @@
                            // Handling comma as decimal separator in Spanish/European context
                            val = parseFloat(val?.replace(',', '.') || 0);
                            if(isNaN(val)) val = 0;
-                      }
-                      item[internalKey] = val;
-                 });
+                       }
+                       item[internalKey] = val;
+                   });
 
-                 item.isDrk = item.name?.toUpperCase().includes('DRK');
-                 
-                 // Only push items that seem to have price data to ensure validity
-                 if(item.p1_price !== undefined) data.push(item);
+                   item.isDrk = item.name?.toUpperCase().includes('DRK');
+                   
+                   // Only push items that seem to have price data to ensure validity
+                   if(item.p1_price !== undefined) data.push(item);
              }
              return data;
         }
