@@ -1965,20 +1965,20 @@
             }
 
             const emailBody = `Hola ${D_BRAND_NAME.toUpperCase()}, confirmo la aceptación de la oferta con CUPS: ${bd.cups}.${LB}${LB}` +
-                                `--- DATOS DE LA OFERTA ---${LB}${LB}` +
-                                `Comercializadora y Tarifa: ${D_BRAND_NAME.toUpperCase()} - ${offer.name}${LB}` +
-                                `Ahorro Anual Estimado: ${eur(bd.savings)}${LB}` +
-                                `Total Mensual Estimado: ${monthlyEstimate}${LB}` +
-                                `${discountLine}` + 
-                                `--- DETALLE DE PRECIOS (€) ---${LB}` +
-                                `${priceDetailText}` +
-                                `------------------------------${LB}${LB}` +
-                                `DATOS DEL CLIENTE (A RELLENAR):${LB}` +
-                                `Nombre completo: ${clientName}${LB}` +
-                                `Teléfono de contacto: ${clientPhone}${LB}` +
-                                `Email de contacto: ${clientEmail}${LB}${LB}` +
-                                `INFORMACIÓN ADICIONAL:${LB}` +
-                                `[AGREGUE CUALQUIER COMENTARIO EXTRA AQUÍ]${LB}${LB}`;
+                                 `--- DATOS DE LA OFERTA ---${LB}${LB}` +
+                                 `Comercializadora y Tarifa: ${D_BRAND_NAME.toUpperCase()} - ${offer.name}${LB}` +
+                                 `Ahorro Anual Estimado: ${eur(bd.savings)}${LB}` +
+                                 `Total Mensual Estimado: ${monthlyEstimate}${LB}` +
+                                 `${discountLine}` + 
+                                 `--- DETALLE DE PRECIOS (€) ---${LB}` +
+                                 `${priceDetailText}` +
+                                 `------------------------------${LB}${LB}` +
+                                 `DATOS DEL CLIENTE (A RELLENAR):${LB}` +
+                                 `Nombre completo: ${clientName}${LB}` +
+                                 `Teléfono de contacto: ${clientPhone}${LB}` +
+                                 `Email de contacto: ${clientEmail}${LB}${LB}` +
+                                 `INFORMACIÓN ADICIONAL:${LB}` +
+                                 `[AGREGUE CUALQUIER COMENTARIO EXTRA AQUÍ]${LB}${LB}`;
 
             const subject = `FORMALIZACIÓN DE CONTRATO - CUPS: ${bd.cups}`;
             const formalizationRecipients = 'f.araujo@drk.es,r.guerra@drk.es,s.caballero@drk.es'; // Email por defecto
@@ -2287,7 +2287,7 @@
                 }
 
                 // Energía
-                preciosRows += `<tr><td colspan="2" style="font-weight: bold; color: ${D_PRIMARY_MED}; padding: 10px 0 2px 0;">ENERGÍA CONSUMIDA (€/kWh)</div></td></tr>`;
+                preciosRows += `<tr><td colspan="2"><div style="font-weight: bold; color: ${D_PRIMARY_MED}; padding: 10px 0 2px 0;">ENERGÍA CONSUMIDA (€/kWh)</div></td></tr>`;
                 for (const e in energyPrices) {
                     preciosRows += `<tr><td style="padding: 5px 8px; border-bottom: 1px solid #eee;">${e}</td><td style="padding: 5px 8px; border-bottom: 1px solid #eee; text-align: right; font-weight: bold; white-space: nowrap;">${numPriceFormula(energyPrices[e])}</td></tr>`;
                 }
@@ -2505,9 +2505,8 @@
             statusEl.classList.remove('hidden');
             
             const sheetId = TARIFF_CONFIG[window.currentTariffType].sheetId;
-            // --- FIX: Cambiando la URL del API de Visualización a la exportación CSV directa ---
-            // Esto mejora la compatibilidad con problemas de CORS en servidores externos (como GitHub Pages).
-            const url = `https://docs.google.com/spreadsheets/d/${sheetId}/export?format=csv&gid=0&t=${Date.now()}`;
+            // --- CORRECCIÓN CLAVE: Usar el endpoint gviz/tq para mayor compatibilidad CORS ---
+            const url = `https://docs.google.com/spreadsheets/d/${sheetId}/gviz/tq?tqx=out:csv&gid=0&t=${Date.now()}`;
 
             try {
                 const response = await fetch(url);
@@ -2517,7 +2516,7 @@
                 
                 document.getElementById('tariff-display-badge').textContent = window.currentTariffs.length;
                 statusEl.textContent = `✅ Tarifas (${window.currentTariffs.length}) cargadas.`;
-                setTimeout(() => statusEl.classList.add('hidden'), 2000); // Hide after 2 seconds
+                setTimeout(() => statusEl.classList.add('hidden'), 2000); 
                 
                 if(window.currentTariffs.length === 0) window.showErrorModal("No se encontraron tarifas en la hoja. Asegúrese de que la hoja está compartida públicamente.");
                 
@@ -2525,7 +2524,7 @@
                 console.error("Error al cargar tarifas:", e);
                 statusEl.textContent = "Error cargando tarifas.";
                 setTimeout(() => statusEl.classList.add('hidden'), 5000); // Hide slower on error
-                window.showErrorModal("Error de conexión con Google Sheets. Asegúrese de que el archivo esté compartido como 'Cualquier persona con el enlace'.");
+                window.showErrorModal("Error crítico de conexión con Google Sheets. Si el problema persiste, verifique que la hoja esté compartida como 'Cualquier persona con el enlace' y que su proveedor de hosting no tenga un bloqueo de CSP/CORS.");
             }
         }
 
@@ -2581,14 +2580,14 @@
                            // Handling comma as decimal separator in Spanish/European context
                            val = parseFloat(val?.replace(',', '.') || 0);
                            if(isNaN(val)) val = 0;
-                       }
-                       item[internalKey] = val;
-                   });
+                         }
+                         item[internalKey] = val;
+                      });
 
-                   item.isDrk = item.name?.toUpperCase().includes('DRK');
-                   
-                   // Only push items that seem to have price data to ensure validity
-                   if(item.p1_price !== undefined) data.push(item);
+                    item.isDrk = item.name?.toUpperCase().includes('DRK');
+                    
+                    // Only push items that seem to have price data to ensure validity
+                    if(item.p1_price !== undefined) data.push(item);
              }
              return data;
         }
@@ -2697,9 +2696,9 @@
                 
                 // Asegurar que el logo DRK no tiene clases de formato multilínea si se re-activa.
                 if (input.value !== 'overall_best') {
-                      // Solo para DRK Únicamente y DRK Prioritario
-                      label.classList.remove('p-1', 'text-center');
-                      label.classList.add('px-2', 'py-2');
+                     // Solo para DRK Únicamente y DRK Prioritario
+                     label.classList.remove('p-1', 'text-center');
+                     label.classList.add('px-2', 'py-2');
                 }
             });
         }
