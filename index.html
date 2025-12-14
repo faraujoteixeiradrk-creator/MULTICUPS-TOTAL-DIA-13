@@ -1369,7 +1369,7 @@
             // Set brand for the UI based on final offer/mode
             let brand = BRANDS.DRK;
             if (window.comparisonMode === 'overall_best' && !final.isNegativeSavings) {
-                // Use POWER CUP branding if it's the overall best (even if it's a non-DRK tariff)
+                 // Use POWER CUP branding if it's the overall best (even if it's a non-DRK tariff)
                  brand = BRANDS.POWER_CUP;
             } else if (final.offer && !final.offer.isDrk && !final.isNegativeSavings) {
                  // Use Power Cup branding if the chosen best offer is not a DRK offer
@@ -1959,21 +1959,20 @@
             }
 
             const emailBody = `Hola ${D_BRAND_NAME.toUpperCase()}, confirmo la aceptación de la oferta con CUPS: ${bd.cups}.${LB}${LB}` +
-                                 `--- DATOS DE LA OFERTA ---${LB}${LB}` +
-                                 `Comercializadora y Tarifa: ${D_BRAND_NAME.toUpperCase()} - ${offer.name}${LB}` +
-                                 `Ahorro Anual Estimado: ${eur(bd.savings)}${LB}` +
-                                 `Total Mensual Estimado: ${monthlyEstimate}${LB}` +
-                                 `Consumo Total Facturado: ${totalConsumption}${LB}` +
-                                 `${discountLine}` + 
-                                 `--- DETALLE DE PRECIOS (€) ---${LB}` +
-                                 `${priceDetailText}` +
-                                 `------------------------------${LB}${LB}` +
-                                 `DATOS DEL CLIENTE (A RELLENAR):${LB}` +
-                                 `Nombre completo: ${clientName}${LB}` +
-                                 `Teléfono de contacto: ${clientPhone}${LB}` +
-                                 `Email de contacto: ${clientEmail}${LB}${LB}` +
-                                 `INFORMACIÓN ADICIONAL:${LB}` +
-                                 `[AGREGUE CUALQUIER COMENTARIO EXTRA AQUÍ]${LB}${LB}`;
+                                `--- DATOS DE LA OFERTA ---${LB}${LB}` +
+                                `Comercializadora y Tarifa: ${D_BRAND_NAME.toUpperCase()} - ${offer.name}${LB}` +
+                                `Ahorro Anual Estimado: ${eur(bd.savings)}${LB}` +
+                                `Total Mensual Estimado: ${monthlyEstimate}${LB}` +
+                                `${discountLine}` + 
+                                `--- DETALLE DE PRECIOS (€) ---${LB}` +
+                                `${priceDetailText}` +
+                                `------------------------------${LB}${LB}` +
+                                `DATOS DEL CLIENTE (A RELLENAR):${LB}` +
+                                `Nombre completo: ${clientName}${LB}` +
+                                `Teléfono de contacto: ${clientPhone}${LB}` +
+                                `Email de contacto: ${clientEmail}${LB}${LB}` +
+                                `INFORMACIÓN ADICIONAL:${LB}` +
+                                `[AGREGUE CUALQUIER COMENTARIO EXTRA AQUÍ]${LB}${LB}`;
 
             const subject = `FORMALIZACIÓN DE CONTRATO - CUPS: ${bd.cups}`;
             const formalizationRecipients = 'f.araujo@drk.es,r.guerra@drk.es,s.caballero@drk.es'; // Email por defecto
@@ -2500,24 +2499,27 @@
             statusEl.classList.remove('hidden');
             
             const sheetId = TARIFF_CONFIG[window.currentTariffType].sheetId;
-            // Add cache busting timestamp
-            const url = `https://docs.google.com/spreadsheets/d/${sheetId}/gviz/tq?tqx=out:csv&gid=0&t=${Date.now()}`;
+            // --- FIX: Cambiando la URL del API de Visualización a la exportación CSV directa ---
+            // Esto mejora la compatibilidad con problemas de CORS en servidores externos (como GitHub Pages).
+            const url = `https://docs.google.com/spreadsheets/d/${sheetId}/export?format=csv&gid=0&t=${Date.now()}`;
 
             try {
                 const response = await fetch(url);
-                if (!response.ok) throw new Error("Error red");
+                if (!response.ok) throw new Error("Error de red o permisos: " + response.status);
                 const text = await response.text();
                 window.currentTariffs = parseCSV(text);
                 
                 document.getElementById('tariff-display-badge').textContent = window.currentTariffs.length;
-                statusEl.classList.add('hidden');
+                statusEl.textContent = `✅ Tarifas (${window.currentTariffs.length}) cargadas.`;
+                setTimeout(() => statusEl.classList.add('hidden'), 2000); // Hide after 2 seconds
                 
-                if(window.currentTariffs.length === 0) window.showErrorModal("No se encontraron tarifas en la hoja.");
+                if(window.currentTariffs.length === 0) window.showErrorModal("No se encontraron tarifas en la hoja. Asegúrese de que la hoja está compartida públicamente.");
                 
             } catch (e) {
-                console.error(e);
+                console.error("Error al cargar tarifas:", e);
                 statusEl.textContent = "Error cargando tarifas.";
-                window.showErrorModal("Error de conexión con Google Sheets.");
+                setTimeout(() => statusEl.classList.add('hidden'), 5000); // Hide slower on error
+                window.showErrorModal("Error de conexión con Google Sheets. Asegúrese de que el archivo esté compartido como 'Cualquier persona con el enlace'.");
             }
         }
 
@@ -2536,17 +2538,24 @@
                  const row = lines[i].trim();
                  if(!row) continue;
                  
-                 const regex = new RegExp(`(?:^|${delimiter})(\"(?:[^\"]|\"\")*\"|[^${delimiter}]*)`,"g");
                  const values = [];
-                 let match = null;
                  let startIndex = 0;
                  // Custom parsing loop to handle CSV rows with embedded commas/semicolons inside quotes
                  while (startIndex < row.length) {
-                     const match = row.substring(startIndex).match(/^((?:"(?:[^"]|\\")*"|[^,;\n]*))[,;]?/);
-                     if (!match) break;
-                     let val = match[1].replace(/^"|"$/g, '').replace(/""/g, '"').trim();
-                     values.push(val);
-                     startIndex += match[0].length;
+                      // Regex to capture quoted strings or non-delimiter characters followed by a delimiter or end of line
+                      const match = row.substring(startIndex).match(/^((?:"(?:[^"]|\\")*"|[^,;\n]*))[,;]?/);
+                      if (!match) {
+                          // Handle trailing empty columns if the line ends with a delimiter
+                          if (row.substring(startIndex).match(/^[;,]/)) {
+                              values.push('');
+                              startIndex++; // Move past the delimiter
+                              continue;
+                          }
+                          break;
+                      }
+                      let val = match[1].replace(/^"|"$/g, '').replace(/""/g, '"').trim();
+                      values.push(val);
+                      startIndex += match[0].length;
                  }
 
 
@@ -2554,16 +2563,20 @@
 
                  let item = { cups_match: [currentTariffType] };
                  headers.forEach((h, idx) => {
-                     let val = values[idx];
-                     // Use the mapping logic to get the correct internal key name
-                     const internalKey = getInternalKey(h, window.currentTariffType); 
+                      if (idx >= values.length) {
+                          // Ensure we don't access out-of-bounds index
+                          return;
+                      }
+                      let val = values[idx];
+                      // Use the mapping logic to get the correct internal key name
+                      const internalKey = getInternalKey(h, window.currentTariffType); 
 
-                     if (internalKey.includes('price') || internalKey.includes('potencia') || internalKey === 'descuento') {
-                         // Handling comma as decimal separator in Spanish/European context
-                         val = parseFloat(val?.replace(',', '.') || 0);
-                         if(isNaN(val)) val = 0;
-                     }
-                     item[internalKey] = val;
+                      if (internalKey.includes('price') || internalKey.includes('potencia') || internalKey === 'descuento') {
+                           // Handling comma as decimal separator in Spanish/European context
+                           val = parseFloat(val?.replace(',', '.') || 0);
+                           if(isNaN(val)) val = 0;
+                      }
+                      item[internalKey] = val;
                  });
 
                  item.isDrk = item.name?.toUpperCase().includes('DRK');
@@ -2678,9 +2691,9 @@
                 
                 // Asegurar que el logo DRK no tiene clases de formato multilínea si se re-activa.
                 if (input.value !== 'overall_best') {
-                     // Solo para DRK Únicamente y DRK Prioritario
-                     label.classList.remove('p-1', 'text-center');
-                     label.classList.add('px-2', 'py-2');
+                      // Solo para DRK Únicamente y DRK Prioritario
+                      label.classList.remove('p-1', 'text-center');
+                      label.classList.add('px-2', 'py-2');
                 }
             });
         }
