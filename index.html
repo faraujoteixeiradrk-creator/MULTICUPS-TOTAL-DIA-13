@@ -482,9 +482,9 @@
                 <div class="border-b border-slate-200 pb-3 mb-3">
                     <h4 class="font-bold text-slate-800 mb-2">Energía (kWh)</h4>
                     <div class="grid grid-cols-2 gap-2">
-                        <input type="number" step="1" id="input-e1-kwh" placeholder="E1 (Punta)" class="p-2 border rounded text-sm focus:outline-none focus:border-2 focus:focus:border-drk-500">
-                        <input type="number" step="1" id="input-e2-kwh" placeholder="E2 (Llano)" class="p-2 border rounded text-sm focus:outline-none focus:border-2 focus:focus:border-drk-500">
-                        <input type="number" step="1" id="input-e3-kwh" placeholder="E3 (Valle)" class="p-2 border rounded text-sm focus:outline-none focus:border-2 focus:focus:border-drk-500">
+                        <input type="number" step="1" id="input-e1-kwh" placeholder="E1" class="p-2 border rounded text-sm focus:outline-none focus:border-2 focus:focus:border-drk-500">
+                        <input type="number" step="1" id="input-e2-kwh" placeholder="E2" class="p-2 border rounded text-sm focus:outline-none focus:border-2 focus:focus:border-drk-500">
+                        <input type="number" step="1" id="input-e3-kwh" placeholder="E3" class="p-2 border rounded text-sm focus:outline-none focus:border-2 focus:focus:border-drk-500">
                         <input type="number" step="1" id="input-e4-kwh" placeholder="E4" class="p-2 border rounded text-sm hidden-period focus:outline-none focus:border-2 focus:focus:border-drk-500">
                         <input type="number" step="1" id="input-e5-kwh" placeholder="E5" class="p-2 border rounded text-sm hidden-period focus:outline-none focus:border-2 focus:focus:border-drk-500">
                         <input type="number" step="1" id="input-e6-kwh" placeholder="E6" class="p-2 border rounded text-sm hidden-period focus:outline-none focus:border-2 focus:focus:border-drk-500">
@@ -820,7 +820,7 @@
                 sagaIcon.innerHTML = brand.LOGO_SVG;
             }
             
-            // 4. MAIN ACTION BUTTONS (Scanner/Input View) - Simplify Manual Button Logic
+            // 4. MAIN ACTION BUTTONS (Scanner/Input View)
             const primaryButtonClass = `w-full bg-gradient-to-r ${brand.PRIMARY_BUTTON} text-white font-bold py-4 px-6 rounded-2xl shadow-lg transform transition active:scale-95 flex items-center justify-center gap-3 mb-3`;
             const startScanBtn = document.getElementById('start-scan-btn');
             if (startScanBtn) startScanBtn.className = primaryButtonClass; // Apply to scan button if visible
@@ -828,31 +828,25 @@
             const secondaryButtonBase = `w-full ${brand.SECONDARY_BUTTON_BG} ${isDrk ? 'hover:bg-drk-100' : 'hover:bg-powercup-100'} ${brand.SECONDARY_BUTTON_TEXT} font-bold py-3 px-6 rounded-xl shadow-sm transform transition active:scale-95 flex items-center justify-center gap-3`;
             const uploadMenuBtn = document.getElementById('upload-menu-btn');
             if (uploadMenuBtn) uploadMenuBtn.className = secondaryButtonBase; // Apply to upload button if visible
-
-            // Apply unique style to Manual Input button based on current mode/tariff
+            
+            // Apply unique style to Manual Input button
             const manualInputBtn = document.getElementById('manual-input-btn');
             if (manualInputBtn) {
-                // Reset base classes
-                manualInputBtn.className = 'w-full font-bold py-3 px-6 rounded-xl shadow-sm transform transition active:scale-95 flex items-center justify-center gap-3';
+                // Remove all previous style classes related to color/bg/hover
+                manualInputBtn.className = manualInputBtn.className.split(' ').filter(c => 
+                    !c.startsWith('bg-') && !c.startsWith('hover:bg-') && !c.startsWith('text-')
+                ).join(' ');
                 
-                const qrButtonsVisible = !document.getElementById('qr-buttons-container')?.classList.contains('hidden');
-                if (qrButtonsVisible) {
+                if (!isDrk && currentTariffType !== 'MULTICUPS') { // POWER CUP active and NOT MultiCups mode
+                    manualInputBtn.classList.add('w-full', 'bg-powercup-500', 'hover:bg-powercup-600', 'text-white', 'font-bold', 'py-3', 'px-6', 'rounded-xl', 'shadow-sm', 'transform', 'transition', 'active:scale-95', 'flex', 'items-center', 'justify-center', 'gap-3');
+                } else { // DRK active or MultiCups mode (uses DRK secondary style)
+                    manualInputBtn.classList.add('w-full', 'font-bold', 'py-3', 'px-6', 'rounded-xl', 'shadow-sm', 'transform', 'transition', 'active:scale-95', ...brand.SECONDARY_BUTTON_BG.split(' '), ...brand.SECONDARY_BUTTON_TEXT.split(' '));
+                }
+                // Re-add mt-3 if QR buttons are visible
+                if (!document.getElementById('qr-buttons-container')?.classList.contains('hidden')) {
                     manualInputBtn.classList.add('mt-3');
                 } else {
                     manualInputBtn.classList.remove('mt-3');
-                }
-
-                // Logic for button color: Primary color if QR is disabled (3.0TD/6.1TD non-multi or MultiCups 3.0TD select)
-                // Otherwise, use the secondary color (QR enabled mode)
-                const tariffTypeForStyle = currentTariffType === 'MULTICUPS' ? multiCupsAddType : currentTariffType;
-                const usePrimaryStyle = (tariffTypeForStyle && !TARIFF_CONFIG[tariffTypeForStyle]?.requiresQR) || (currentTariffType === 'MULTICUPS' && multiCupsAddType === '3.0TD');
-                
-                if (usePrimaryStyle && tariffTypeForStyle) {
-                     // Use primary style (3.0TD/6.1TD flow, or MultiCups 3.0TD)
-                    manualInputBtn.classList.add(`bg-${accent500}`, `hover:bg-${isDrk ? 'drk-600' : 'powercup-600'}`, 'text-white');
-                } else {
-                    // Use secondary style (2.0TD flow, or MultiCups 2.0TD)
-                    manualInputBtn.classList.add(...brand.SECONDARY_BUTTON_BG.split(' '), ...brand.SECONDARY_BUTTON_TEXT.split(' '));
                 }
             }
             
@@ -986,16 +980,16 @@
         }
 
         function toggleMultiCupsInputPeriods(tariffType, prefix = 'input') {
-            const isSixPeriods = tariffType === '3.0TD' || tariffType === '6.1TD';
+            const isHighVoltage = tariffType === '3.0TD' || tariffType === '6.1TD';
             const periods = document.querySelectorAll(`[id^="${prefix}-p3-kw"], [id^="${prefix}-p4-kw"], [id^="${prefix}-p5-kw"], [id^="${prefix}-p6-kw"], [id^="${prefix}-e4-kwh"], [id^="${prefix}-e5-kwh"], [id^="${prefix}-e6-kwh"]`);
             
             periods.forEach(el => {
-                el.style.display = isSixPeriods ? 'block' : 'none';
+                el.style.display = isHighVoltage ? 'block' : 'none';
             });
             // Ocultar/Mostrar campos de E1/E2/E3
-            document.getElementById('input-e1-kwh').placeholder = isSixPeriods ? 'E1' : 'E1 (Punta)';
-            document.getElementById('input-e2-kwh').placeholder = isSixPeriods ? 'E2' : 'E2 (Llano)';
-            document.getElementById('input-e3-kwh').placeholder = isSixPeriods ? 'E3' : 'E3 (Valle)';
+            document.getElementById('input-e1-kwh').placeholder = isHighVoltage ? 'E1' : 'E1 (Punta)';
+            document.getElementById('input-e2-kwh').placeholder = isHighVoltage ? 'E2' : 'E2 (Llano)';
+            document.getElementById('input-e3-kwh').placeholder = isHighVoltage ? 'E3' : 'E3 (Valle)';
         }
 
         function selectTariffType(type) {
@@ -1029,10 +1023,11 @@
                 // --- FIX: 3.0TD/6.1TD always manual (Issue 2) ---
                 if (config.requiresQR) { // 2.0TD
                     qrButtonsContainer.classList.remove('hidden');
-                    // manual input button has mt-3 if QR is present
+                    document.getElementById('manual-input-btn').classList.add('mt-3');
                     document.getElementById('scan-instruction-text').textContent = "Escanea el código QR o introduce datos manualmente.";
                 } else { // 3.0TD, 6.1TD (Siempre manual)
                     qrButtonsContainer.classList.add('hidden');
+                    document.getElementById('manual-input-btn').classList.remove('mt-3');
                     document.getElementById('scan-instruction-text').textContent = "Introduce los datos de la factura manualmente.";
                     document.getElementById('qr-toggle-checkbox').checked = false;
                     document.getElementById('qr-content-wrapper').classList.remove('active');
@@ -1040,9 +1035,6 @@
 
                 document.getElementById('current-tariff-label').textContent = config.label;
                 document.getElementById('app-subtitle').textContent = `Comparador ${config.label}`;
-                
-                // Aplicar estilos de botón manual antes de la vista
-                applyBrandStyles(activeBrand);
                 
                 // Mostrar/Ocultar inputs P3-P6/E4-E6
                 toggleMultiCupsInputPeriods(currentTariffType, 'input');
@@ -1197,13 +1189,8 @@
         function compareOffers(data) {
             const tariffType = currentTariffType;  
             const tariffsToCompare = currentTariffs[tariffType] || [];
-            
-            const totalEnergy = Object.keys(data).filter(k => k.startsWith('consumo')).reduce((sum, key) => sum + (data[key] || 0), 0);
-            const totalPower = (data.potencia_p1_kw || 0) + (data.potencia_p2_kw || 0);
 
             if (tariffsToCompare.length === 0) return window.showErrorModal(`Las tarifas ${tariffType} no están cargadas.`);
-            
-            if (totalEnergy === 0 && totalPower === 0) return window.showErrorModal("Introduce al menos Potencia (P1 o P2) o Consumo (E1) para realizar la simulación.");
 
             const results = tariffsToCompare.map(t => calculateTariffCost(t, data, tariffType));
             
@@ -1351,18 +1338,18 @@
             if (type === '2.0TD') {
                 // 2.0TD: QR and Manual
                 qrButtonsContainer.classList.remove('hidden');
+                manualInputBtn.classList.add('mt-3');
                 scanInstructionText.textContent = "Escanea el código QR (2.0TD) o introduce datos manualmente.";
             } else if (type === '3.0TD') {
                 // 3.0TD: ONLY Manual
                 qrButtonsContainer.classList.add('hidden');
+                manualInputBtn.classList.remove('mt-3');
                 scanInstructionText.textContent = "Introduce los datos de la factura 3.0TD manualmente.";
             }
             
             manualInputBtn.textContent = "AÑADIR SUMINISTRO MANUAL";
-            
-            // 4. Aplicar estilos de botón (llama a applyBrandStyles y actualiza el color del botón manual)
+            // Asegurarse de aplicar los estilos correctos al botón manual
             applyBrandStyles(activeBrand);  
-            
             // Ocultar status de carga, ya que ya están cargadas desde la vista SAGA
             document.getElementById('loading-status').classList.add('hidden');
         }
@@ -1387,24 +1374,23 @@
 
                 // Acumulación de Potencias y Energías (para el desglose detallado)
                 const type = current.originalTariffType;
-                const normalizedType = type === '6.1TD' ? '3.0TD' : type;
                 
                 // General Power Accumulation (P1-P6)
                 for (let i = 1; i <= 6; i++) {
                     const kwKey = `potencia_p${i}_kw`;
-                    acc.aggregatedData[normalizedType].power[`p${i}`] += current[kwKey] || 0;
+                    acc.aggregatedData[type].power[`p${i}`] += current[kwKey] || 0;
                 }
 
                 // General Energy Accumulation (E1-E6)
                 // Use consumption names based on the type, but store generically
-                if (normalizedType === '2.0TD') {
-                    acc.aggregatedData[normalizedType].energy.e1 += current.consumo_punta || 0;
-                    acc.aggregatedData[normalizedType].energy.e2 += current.consumo_llano || 0;
-                    acc.aggregatedData[normalizedType].energy.e3 += current.consumo_valle || 0;
-                } else if (normalizedType === '3.0TD') {
+                if (type === '2.0TD') {
+                    acc.aggregatedData[type].energy.e1 += current.consumo_punta || 0;
+                    acc.aggregatedData[type].energy.e2 += current.consumo_llano || 0;
+                    acc.aggregatedData[type].energy.e3 += current.consumo_valle || 0;
+                } else if (type === '3.0TD' || type === '6.1TD') {
                     for (let i = 1; i <= 6; i++) {
                         // For 3.0TD/6.1TD, fields are named consumo_p1 to consumo_p6
-                        acc.aggregatedData[normalizedType].energy[`e${i}`] += current[`consumo_p${i}`] || 0;
+                        acc.aggregatedData[type].energy[`e${i}`] += current[`consumo_p${i}`] || 0;
                     }
                 }
                 
@@ -1424,6 +1410,9 @@
             total.savings = total.originalBillAnnual - total.totalAnnual;
 
             // 3. Determinar la Oferta de Referencia para el resumen
+            // The offer used here is mostly for display in the main header of the results view, 
+            // the savings are already calculated based on the actual best offer per CUPS (stored in multiCupsData).
+            // We use the most common winning offer's name/description for the consolidated header display.
             const bestOverallWinner = multiCupsData.reduce((best, current) => {
                 if (current.savings > best.savings) return { savings: current.savings, offer: current.offer };
                 return best;
@@ -1440,6 +1429,7 @@
                 savings: total.savings,
                 offer: bestOverallWinner.offer, // Use the offer name from the single best saving CUPS for the header display
                 isMulti: true,
+                // FIX: Merge totalConsumptions calculation directly into the object to avoid ReferenceError
                 totalConsumptions: { 
                     consumo_punta: total.aggregatedData['2.0TD'].energy.e1,
                     consumo_llano: total.aggregatedData['2.0TD'].energy.e2,
@@ -1727,8 +1717,8 @@
                      if (p.period <= powerPeriods) {
                          powerBreakdown += `<div class="flex justify-between"><span>P${p.period} (${num(p.kw, 2)} kW x ${numPriceFormula(p.priceDay)} €/día)</span><span>${num(p.cost, 2)} €</span></div>`;
                     }
-                     });
-                                 
+                 });
+                         
                 const statusText = resItem.isNegativeSavings ?  
                     `<p class="text-sm font-bold text-red-600 mb-2">⚠️ TU TARIFA ACTUAL es la mejor</p>` :
                     `<p class="text-sm font-bold text-green-600 mb-2">💰 AHORRO ANUAL: ${eur(resItem.savings)}</p>`;
@@ -2319,8 +2309,8 @@
                 const powerPeriods = currentConfig.powerPeriods;
                 
                 // Determinar el nombre de la tarifa final aplicada
-                const appliedOfferName = resItem.offer.isDrk  
-                    ? `${resItem.offer.name} - ${resItem.offer.description}`  
+                const appliedOfferName = resItem.offer.isDrk 
+                    ? `${resItem.offer.name} - ${resItem.offer.description}` 
                     : resItem.offer.name;
 
                 // Desglose: Potencia
@@ -2584,14 +2574,8 @@
             data['consumo_valle'] = data.consumo_p3;
             
             
-            // --- VALIDACIÓN DE DATOS ---
-            const totalEnergy = Object.keys(data).filter(k => k.startsWith('consumo_')).reduce((sum, key) => sum + (data[key] || 0), 0);
-            const totalPower = Object.keys(data).filter(k => k.startsWith('potencia_')).reduce((sum, key) => sum + (data[key] || 0), 0);
-            
             if (data.importe_total <= 0) return window.showErrorModal("Introduce el total de la factura.");
-            if (totalEnergy === 0 && totalPower === 0) return window.showErrorModal("Introduce al menos Potencia (P1 o P2) o Consumo (E1) para realizar la simulación.");
-            // --- FIN VALIDACIÓN ---
-
+            
             closeManualInputModal();
             
             if (isMultiCupsMode) {
@@ -2928,7 +2912,7 @@
                      document.getElementById('manual-input-modal').classList.remove('hidden');
                      document.getElementById('manual-input-modal').classList.add('flex');
                 } else {
-                    window.showErrorModal("Las tarifas no han cargado aún. Por favor, intente de nuevo.");
+                     window.showErrorModal("Las tarifas no han cargado aún. Por favor, intente de nuevo.");
                 }
             }
         }
@@ -2948,7 +2932,7 @@
                 modal.querySelector('h3').textContent = `Confirmar Suministro MultiCups`; // NEW: Adjust title for MultiCups
             } else {
                  // Modo Individual, solo opciones completas
-                 selectEl.innerHTML = `<option value="2.0TD">2.0 TD (Punta, Llano, Valle)</option><option value="3.0TD">3.0 TD (6 Periodos)</option><option value="6.1TD">6.1 TD (6 Periodos)</option>`;
+                 selectEl.innerHTML = `<option value="2.0TD">2.0 TD (Punta, Llano, Valle)</option><option value="3.0TD">3.0 TD (6 Periodos)</option>`;
                  selectEl.value = data.originalTariffType;  
                  modal.querySelector('h3').textContent = `Confirmar Suministro`; // Reset title for Individual
             }
@@ -3055,7 +3039,7 @@
                 // Best DRK is the DRK one with the lowest annual cost
                 if (r.offer.isDrk) {
                     if (!bestDrk || annualCost < bestDrk.totalAnnual) {
-                          bestDrk = r;
+                         bestDrk = r;
                     }
                 }
             });
@@ -3150,11 +3134,8 @@
              if (lines.length < 2) return [];
              
              const rawHeader = lines[0];
-             // More robust delimiter detection: assume ; if the first line contains more ; than ,
-             let semicolonCount = (rawHeader.match(/;/g) || []).length;
-             let commaCount = (rawHeader.match(/,/g) || []).length;
-             const delimiter = semicolonCount > commaCount ? ';' : ',';
-
+             const delimiter = rawHeader.includes(';') ? ';' : ',';
+             
              const headers = rawHeader.split(delimiter).map(h => h.trim().toLowerCase().replace(/"/g, ''));
              const data = [];
 
@@ -3162,9 +3143,14 @@
                  const row = lines[i].trim();
                  if(!row) continue;
                  
-                 // Use a simpler split for parsing values, since the regex used for quoted fields
-                 // is complex and often unnecessary for simple CSVs from Google Sheets.
-                 const values = row.split(delimiter).map(v => v.trim().replace(/^"|"$/g, '').replace(/""/g, '"'));
+                 const regex = new RegExp(`(?:^|${delimiter})(\"(?:[^\"]|\"\")*\"|[^${delimiter}]*)`,"g");
+                 const values = [];
+                 let match = null;
+                 regex.lastIndex = 0;  
+                 while(match = regex.exec(row)){
+                     let val = match[1].replace(/^"|"$/g, '').replace(/""/g, '"');
+                     values.push(val);
+                 }
 
                  if(values.length < 2) continue;
 
