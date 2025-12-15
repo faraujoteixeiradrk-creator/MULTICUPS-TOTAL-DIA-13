@@ -20,6 +20,7 @@
                             900: '#0c4a6e',
                         },
                         powercup: {
+                            // Mantenemos estos para compatibilidad y uso general
                             50: '#f7fee7',
                             100: '#ecfccb',
                             400: '#a3e635', /* Lighter Green for Active Hover */
@@ -28,6 +29,11 @@
                             800: '#3f6212',
                             900: '#365314',
                             'yellow-flash': '#facc15',
+                        },
+                        // Nuevos colores para asegurar el verde en el flujo de resultados y CTA
+                        'cta-green': {
+                            500: '#16a34a', /* Usado para los ahorros */
+                            600: '#15803d',
                         },
                         'cta-red': {
                             500: '#CC0000',
@@ -151,7 +157,6 @@
             height: 100px; 
             opacity: 0.01; /* Debe ser casi transparente, pero no 0 */
             z-index: 1000; /* Siempre visible cuando activo */
-            pointer-events: auto;
             border: 4px dashed var(--qr-border-color, #0ea5e9);
             background-color: white;
         }
@@ -237,7 +242,7 @@
 
                     <button onclick="selectTariffType('3.0TD')" class="tariff-select-btn group">
                         <div class="icon-wrapper bg-drk-50 text-drk-600 group-hover:bg-drk-100">
-                            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="w-6 h-6"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h3.18a2 2 0 0 0 1.51-.72L11 1l2 2h3.18a2 2 0 0 1 1.51.72L20 5h1.18a2 2 0 0 1 2 2z"></path><path d="M14 9H8v8h8V9z"></path></svg>
+                            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="w-6 h-6"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 01-2-2V5a2 2 0 012-2h3.18a2 2 0 001.51-.72L11 1l2 2h3.18a2 2 0 011.51.72L20 5h1.18a2 2 0 012 2z"></path><path d="M14 9H8v8h8V9z"></path></svg>
                         </div>
                         <div class="text-left">
                             <span class="text-lg font-bold text-drk-900">3.0 TD</span>
@@ -850,32 +855,52 @@
                 }
             }
             
-            // 5. MANUAL INPUT MODAL STYLES (Individual)
-            const modal = document.getElementById('manual-input-modal');
-            const modalTitle = modal.querySelector('h3');
-            const calcBtn = modal.querySelector('#execute-manual-input-btn');
-            
-            const titleTextClass = isDrk ? 'text-drk-800' : 'text-powercup-800';
             const focusColorClass = isDrk ? 'focus:border-drk-500' : 'focus:border-powercup-500';  
             const calcBtnBg = isDrk ? 'bg-drk-500 hover:bg-drk-600' : 'bg-powercup-500 hover:bg-powercup-600';
-
-            if (modalTitle) {
-                modalTitle.classList.remove('text-drk-800', 'text-powercup-800');
-                modalTitle.classList.add(titleTextClass);
-            }
             
-            modal.querySelectorAll('input[type="text"], input[type="number"], select').forEach(input => {
+            // 5. MANUAL INPUT MODAL STYLES
+            const manualModal = document.getElementById('manual-input-modal');
+            manualModal.querySelector('h3#manual-modal-title').className = `text-xl font-bold ${text800} mb-4`;
+            manualModal.querySelectorAll('input[type="text"], input[type="number"], select').forEach(input => {
                 input.classList.remove('focus:border-drk-500', 'focus:border-powercup-500');
                 input.classList.add(focusColorClass);
             });
+            manualModal.querySelector('#execute-manual-input-btn').className = `w-full text-white font-bold py-3 rounded-xl shadow-md mb-3 ${calcBtnBg}`;
 
-            if (calcBtn) {
-                calcBtn.className = calcBtn.className.split(' ').filter(c => !c.startsWith('bg-') && !c.startsWith('hover:bg-')).join(' ');
-                calcBtn.classList.add('w-full', 'text-white', 'font-bold', 'py-3', 'rounded-xl', 'shadow-md', 'mb-3', ...calcBtnBg.split(' '));
+            // 6. QR OPTIONS MODAL STYLES (Modal 8)
+            const qrOptionsModal = document.getElementById('qr-options-modal');
+            qrOptionsModal.querySelector('h3#modal-qr-title').className = `text-xl font-bold ${text800} mb-4`;
+
+            const uploadBtn = document.getElementById('modal-upload-file-btn');
+            const pasteBtn = document.getElementById('modal-paste-image-btn');
+            
+            if (uploadBtn) {
+                uploadBtn.className = `w-full text-white font-bold py-3 px-6 rounded-xl shadow-md mb-3 transform transition active:scale-95 ${isDrk ? 'bg-drk-800 hover:bg-drk-900' : 'bg-powercup-800 hover:bg-powercup-900'}`;
             }
 
+            if (pasteBtn) {
+                pasteBtn.className = `w-full text-white font-bold py-3 px-6 rounded-xl shadow-md mb-4 transform transition active:scale-95 ${isDrk ? 'bg-drk-600 hover:bg-drk-800' : 'bg-powercup-600 hover:bg-powercup-800'}`;
+            }
 
-            // 6. Result Header Gradient & Card Borders
+            // 7. QR CONFIRM MODAL STYLES (Modal 7)
+            const qrConfirmModal = document.getElementById('qr-confirm-modal');
+            qrConfirmModal.querySelector('h3').className = `text-xl font-bold ${text800} mb-2`;
+            qrConfirmModal.querySelector('#confirm-save-supply-btn').className = `w-full text-white font-bold py-3 rounded-xl shadow-md mb-3 ${calcBtnBg}`;
+
+            // 8. SCANNER VIEW
+            document.getElementById('scanner-guide').classList.remove('border-drk-500', 'border-powercup-500');
+            document.getElementById('scanner-guide').classList.add(borderColor);
+            
+            const captureBtn = document.getElementById('capture-photo-btn');
+            if (captureBtn) {
+                captureBtn.classList.remove('border-drk-500', 'text-drk-800', 'border-powercup-500', 'text-powercup-800');
+                captureBtn.classList.add('border-2', 'bg-white', borderColor, text800);
+            }
+
+            document.getElementById('paste-catcher').style.setProperty('--qr-border-color', brand.QR_BORDER_COLOR);
+
+
+            // 9. Result Header Gradient & Card Borders
             document.getElementById('result-header').className = `bg-gradient-to-r ${brand.PRIMARY_BG_GRADIENT} p-6 text-white text-center relative overflow-hidden`;
             document.getElementById('initial-card').className = `bg-white p-6 rounded-3xl shadow-xl text-center border-t-4 ${borderColor} relative`;
             document.getElementById('landing-card').className = `bg-white p-6 md:p-8 rounded-3xl shadow-2xl w-full border-t-4 ${borderColor}`;
@@ -883,13 +908,12 @@
             const sagaCard = document.getElementById('multicups-saga-card');
             if (sagaCard) sagaCard.className = `bg-white p-6 md:p-p8 rounded-3xl shadow-2xl w-full border-t-4 ${borderColor} relative`;
 
-
-            // 7. TARIFF BADGE COLOR (In Initial View)
+            // 10. TARIFF BADGE COLOR (In Initial View)
             const tariffBadge = document.getElementById('tariff-badge');
             tariffBadge.classList.remove('bg-drk-500', 'bg-powercup-500');  
             tariffBadge.classList.add(`bg-${accent500}`);
 
-            // 8. Landing Page Tariff Buttons  
+            // 11. Landing Page Tariff Buttons  
             document.querySelectorAll('.tariff-select-btn').forEach(btn => {
                 const iconWrapper = btn.querySelector('.icon-wrapper');
                 const arrowIcon = btn.querySelector('.arrow-icon');
@@ -909,20 +933,6 @@
                     btn.classList.add('border-powercup-300', 'hover:border-powercup-500');
                 }
             });
-            
-            // 9. QR related components
-            const qrVisualContainer = document.getElementById('qr-visual-container');
-            qrVisualContainer.style.setProperty('--qr-border-color', brand.QR_BORDER_COLOR);
-            qrVisualContainer.style.setProperty('--qr-center-bg', brand.QR_CENTER_BG); // Actualizar CSS Variable
-            document.getElementById('scanner-guide').classList.remove('border-drk-500', 'border-powercup-500');
-            document.getElementById('scanner-guide').classList.add(borderColor);
-            document.getElementById('capture-photo-btn').classList.remove('border-drk-500', 'text-drk-800', 'border-powercup-500', 'text-powercup-800');
-            document.getElementById('capture-photo-btn').classList.add('border-2', borderColor, text800);
-            
-            // 10. Regenerar QR si está visible
-            if (document.getElementById('qr-toggle-checkbox').checked) {
-                generateQRCode(brand);
-            }
         }
         
         // --- FUNCIONES DE LIMPIEZA ---
@@ -958,7 +968,7 @@
             const brandToApply = comparisonMode === 'overall_best' ? BRANDS.POWER_CUP : BRANDS.DRK;
             applyBrandStyles(brandToApply);  
             
-            const selectorInput = document.querySelector(`input[name="comparison_mode"][value="${comparisonMode}"]`);
+            const selectorInput = document.querySelector(`input[name="comparison_mode"]:checked`);
             if (selectorInput) {
                 selectorInput.checked = true;
                 selectorInput.dispatchEvent(new Event('change'));
@@ -1378,6 +1388,7 @@
                 // General Power Accumulation (P1-P6)
                 for (let i = 1; i <= 6; i++) {
                     const kwKey = `potencia_p${i}_kw`;
+                    // Usar la potencia contratada por el usuario (la que se introdujo/extrajo)
                     acc.aggregatedData[type].power[`p${i}`] += current[kwKey] || 0;
                 }
 
@@ -1411,13 +1422,21 @@
 
             // 3. Determinar la Oferta de Referencia para el resumen
             // The offer used here is mostly for display in the main header of the results view, 
-            // the savings are already calculated based on the actual best offer per CUPS (stored in multiCupsData).
-            // We use the most common winning offer's name/description for the consolidated header display.
-            const bestOverallWinner = multiCupsData.reduce((best, current) => {
-                if (current.savings > best.savings) return { savings: current.savings, offer: current.offer };
+            // we use the best *overall* winning offer (by savings) to represent the consolidated result.
+            let bestOverallWinner = multiCupsData.reduce((best, current) => {
+                if (current.savings > best.savings) return { savings: current.savings, offer: current.offer, originalTariffType: current.originalTariffType };
                 return best;
-            }, { savings: 0, offer: BRANDS.DRK.NAME.includes('DRK') ? (currentTariffs['2.0TD']?.find(t => t.isDrk) || { name: 'Oferta DRK', description: 'Consolidada' }) : { name: 'Resultado Consolidado', description: 'Power Cup Global' } });
+            }, { 
+                savings: 0, 
+                offer: BRANDS.DRK.NAME.includes('DRK') 
+                    ? (currentTariffs['2.0TD']?.find(t => t.isDrk) || { name: 'Oferta DRK', description: 'Consolidada' }) 
+                    : { name: 'Resultado Consolidado', description: 'Power Cup Global' },
+                originalTariffType: '2.0TD' // Default to 2.0TD if no actual winner found
+            });
 
+            if (total.savings <= 0) {
+                 bestOverallWinner.offer = { name: "Tu Tarifa Actual", description: "Es la mejor opción consolidada", isDrk: false };
+            }
 
             const finalResult = {
                 cups: `${multiCupsData.length} CUPS`, // String for display
@@ -1429,7 +1448,6 @@
                 savings: total.savings,
                 offer: bestOverallWinner.offer, // Use the offer name from the single best saving CUPS for the header display
                 isMulti: true,
-                // FIX: Merge totalConsumptions calculation directly into the object to avoid ReferenceError
                 totalConsumptions: { 
                     consumo_punta: total.aggregatedData['2.0TD'].energy.e1,
                     consumo_llano: total.aggregatedData['2.0TD'].energy.e2,
@@ -1716,9 +1734,9 @@
                 resItem.powerCosts.forEach(p => {
                      if (p.period <= powerPeriods) {
                          powerBreakdown += `<div class="flex justify-between"><span>P${p.period} (${num(p.kw, 2)} kW x ${numPriceFormula(p.priceDay)} €/día)</span><span>${num(p.cost, 2)} €</span></div>`;
-                    }
-                 });
-                         
+                     }
+                   });
+                     
                 const statusText = resItem.isNegativeSavings ?  
                     `<p class="text-sm font-bold text-red-600 mb-2">⚠️ TU TARIFA ACTUAL es la mejor</p>` :
                     `<p class="text-sm font-bold text-green-600 mb-2">💰 AHORRO ANUAL: ${eur(resItem.savings)}</p>`;
@@ -2044,7 +2062,7 @@
 
             const emailBody = `Hola ${D_BRAND_NAME.toUpperCase()}, confirmo la aceptación de la oferta con CUPS: ${bd.cups}.${LB}${LB}` +
                                  `--- DATOS DE LA OFERTA ---${LB}${LB}` +
-                                 `Comercializadora y Tarifa: ${commercialTariffName}${LB}` + 
+                                 `Comercializadora y Tarifa: ${commercialTariffName}${LB}` +  
                                  `Zona Geográfica: ${ZONA_GEOGRAFICA}${LB}` + // ADDED
                                  `Ahorro Anual Estimado: ${eur(bd.savings)}${LB}` +
                                  `Total Mensual Estimado: ${monthlyEstimate}${LB}` +
