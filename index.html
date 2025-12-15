@@ -482,9 +482,9 @@
                 <div class="border-b border-slate-200 pb-3 mb-3">
                     <h4 class="font-bold text-slate-800 mb-2">Energía (kWh)</h4>
                     <div class="grid grid-cols-2 gap-2">
-                        <input type="number" step="1" id="input-e1-kwh" placeholder="E1" class="p-2 border rounded text-sm focus:outline-none focus:border-2 focus:focus:border-drk-500">
-                        <input type="number" step="1" id="input-e2-kwh" placeholder="E2" class="p-2 border rounded text-sm focus:outline-none focus:border-2 focus:focus:border-drk-500">
-                        <input type="number" step="1" id="input-e3-kwh" placeholder="E3" class="p-2 border rounded text-sm focus:outline-none focus:border-2 focus:focus:border-drk-500">
+                        <input type="number" step="1" id="input-e1-kwh" placeholder="E1 (Punta)" class="p-2 border rounded text-sm focus:outline-none focus:border-2 focus:focus:border-drk-500">
+                        <input type="number" step="1" id="input-e2-kwh" placeholder="E2 (Llano)" class="p-2 border rounded text-sm focus:outline-none focus:border-2 focus:focus:border-drk-500">
+                        <input type="number" step="1" id="input-e3-kwh" placeholder="E3 (Valle)" class="p-2 border rounded text-sm focus:outline-none focus:border-2 focus:focus:border-drk-500">
                         <input type="number" step="1" id="input-e4-kwh" placeholder="E4" class="p-2 border rounded text-sm hidden-period focus:outline-none focus:border-2 focus:focus:border-drk-500">
                         <input type="number" step="1" id="input-e5-kwh" placeholder="E5" class="p-2 border rounded text-sm hidden-period focus:outline-none focus:border-2 focus:focus:border-drk-500">
                         <input type="number" step="1" id="input-e6-kwh" placeholder="E6" class="p-2 border rounded text-sm hidden-period focus:outline-none focus:border-2 focus:focus:border-drk-500">
@@ -644,6 +644,34 @@
             // Best 6.1TD will be the same as 3.0TD sheet since they share the sheet ID
             return { best20TD, best30TD };
         }
+
+        // Función para obtener las ofertas GANADORAS (no necesariamente DRK) consolidadas por tipo.
+        function getWinningOffersPerType(results) {
+            const winningOffers = { '2.0TD': null, '3.0TD': null, '6.1TD': null };
+            let hasDrkWinner = false;
+            
+            results.forEach(resItem => {
+                const type = resItem.originalTariffType;
+                const winnerOffer = resItem.offer;
+                
+                // Track if any DRK offer won
+                if (winnerOffer.isDrk && winnerOffer.name !== 'Tu Tarifa Actual') {
+                    hasDrkWinner = true;
+                }
+
+                // Collect the winning offer for this type
+                if (type === '2.0TD' || type === '3.0TD' || type === '6.1TD') {
+                    const key = (type === '6.1TD' ? '3.0TD' : type); // Group 3.0TD and 6.1TD if needed for price lookup, though price fields are the same.
+                    
+                    // Prioritize showing a named offer that won for this type, or the lowest cost winner if multiple non-named winners existed.
+                    if (!winningOffers[key] || winnerOffer.name !== 'Tu Tarifa Actual') {
+                        winningOffers[key] = winnerOffer;
+                    }
+                }
+            });
+            
+            return { winningOffers, hasDrkWinner };
+        }
         
         // --- FUNCIONES DE MODALES Y UI ---
         
@@ -792,7 +820,7 @@
                 sagaIcon.innerHTML = brand.LOGO_SVG;
             }
             
-            // 4. MAIN ACTION BUTTONS (Scanner/Input View)
+            // 4. MAIN ACTION BUTTONS (Scanner/Input View) - Simplify Manual Button Logic
             const primaryButtonClass = `w-full bg-gradient-to-r ${brand.PRIMARY_BUTTON} text-white font-bold py-4 px-6 rounded-2xl shadow-lg transform transition active:scale-95 flex items-center justify-center gap-3 mb-3`;
             const startScanBtn = document.getElementById('start-scan-btn');
             if (startScanBtn) startScanBtn.className = primaryButtonClass; // Apply to scan button if visible
@@ -800,25 +828,31 @@
             const secondaryButtonBase = `w-full ${brand.SECONDARY_BUTTON_BG} ${isDrk ? 'hover:bg-drk-100' : 'hover:bg-powercup-100'} ${brand.SECONDARY_BUTTON_TEXT} font-bold py-3 px-6 rounded-xl shadow-sm transform transition active:scale-95 flex items-center justify-center gap-3`;
             const uploadMenuBtn = document.getElementById('upload-menu-btn');
             if (uploadMenuBtn) uploadMenuBtn.className = secondaryButtonBase; // Apply to upload button if visible
-            
-            // Apply unique style to Manual Input button
+
+            // Apply unique style to Manual Input button based on current mode/tariff
             const manualInputBtn = document.getElementById('manual-input-btn');
             if (manualInputBtn) {
-                // Remove all previous style classes related to color/bg/hover
-                manualInputBtn.className = manualInputBtn.className.split(' ').filter(c => 
-                    !c.startsWith('bg-') && !c.startsWith('hover:bg-') && !c.startsWith('text-')
-                ).join(' ');
+                // Reset base classes
+                manualInputBtn.className = 'w-full font-bold py-3 px-6 rounded-xl shadow-sm transform transition active:scale-95 flex items-center justify-center gap-3';
                 
-                if (!isDrk && currentTariffType !== 'MULTICUPS') { // POWER CUP active and NOT MultiCups mode
-                    manualInputBtn.classList.add('w-full', 'bg-powercup-500', 'hover:bg-powercup-600', 'text-white', 'font-bold', 'py-3', 'px-6', 'rounded-xl', 'shadow-sm', 'transform', 'transition', 'active:scale-95', 'flex', 'items-center', 'justify-center', 'gap-3');
-                } else { // DRK active or MultiCups mode (uses DRK secondary style)
-                    manualInputBtn.classList.add('w-full', 'font-bold', 'py-3', 'px-6', 'rounded-xl', 'shadow-sm', 'transform', 'transition', 'active:scale-95', ...brand.SECONDARY_BUTTON_BG.split(' '), ...brand.SECONDARY_BUTTON_TEXT.split(' '));
-                }
-                // Re-add mt-3 if QR buttons are visible
-                if (!document.getElementById('qr-buttons-container')?.classList.contains('hidden')) {
+                const qrButtonsVisible = !document.getElementById('qr-buttons-container')?.classList.contains('hidden');
+                if (qrButtonsVisible) {
                     manualInputBtn.classList.add('mt-3');
                 } else {
                     manualInputBtn.classList.remove('mt-3');
+                }
+
+                // Logic for button color: Primary color if QR is disabled (3.0TD/6.1TD non-multi or MultiCups 3.0TD select)
+                // Otherwise, use the secondary color (QR enabled mode)
+                const tariffTypeForStyle = currentTariffType === 'MULTICUPS' ? multiCupsAddType : currentTariffType;
+                const usePrimaryStyle = (tariffTypeForStyle && !TARIFF_CONFIG[tariffTypeForStyle]?.requiresQR) || (currentTariffType === 'MULTICUPS' && multiCupsAddType === '3.0TD');
+                
+                if (usePrimaryStyle && tariffTypeForStyle) {
+                     // Use primary style (3.0TD/6.1TD flow, or MultiCups 3.0TD)
+                    manualInputBtn.classList.add(`bg-${accent500}`, `hover:bg-${isDrk ? 'drk-600' : 'powercup-600'}`, 'text-white');
+                } else {
+                    // Use secondary style (2.0TD flow, or MultiCups 2.0TD)
+                    manualInputBtn.classList.add(...brand.SECONDARY_BUTTON_BG.split(' '), ...brand.SECONDARY_BUTTON_TEXT.split(' '));
                 }
             }
             
@@ -952,16 +986,16 @@
         }
 
         function toggleMultiCupsInputPeriods(tariffType, prefix = 'input') {
-            const isHighVoltage = tariffType === '3.0TD' || tariffType === '6.1TD';
+            const isSixPeriods = tariffType === '3.0TD' || tariffType === '6.1TD';
             const periods = document.querySelectorAll(`[id^="${prefix}-p3-kw"], [id^="${prefix}-p4-kw"], [id^="${prefix}-p5-kw"], [id^="${prefix}-p6-kw"], [id^="${prefix}-e4-kwh"], [id^="${prefix}-e5-kwh"], [id^="${prefix}-e6-kwh"]`);
             
             periods.forEach(el => {
-                el.style.display = isHighVoltage ? 'block' : 'none';
+                el.style.display = isSixPeriods ? 'block' : 'none';
             });
             // Ocultar/Mostrar campos de E1/E2/E3
-            document.getElementById('input-e1-kwh').placeholder = isHighVoltage ? 'E1' : 'E1 (Punta)';
-            document.getElementById('input-e2-kwh').placeholder = isHighVoltage ? 'E2' : 'E2 (Llano)';
-            document.getElementById('input-e3-kwh').placeholder = isHighVoltage ? 'E3' : 'E3 (Valle)';
+            document.getElementById('input-e1-kwh').placeholder = isSixPeriods ? 'E1' : 'E1 (Punta)';
+            document.getElementById('input-e2-kwh').placeholder = isSixPeriods ? 'E2' : 'E2 (Llano)';
+            document.getElementById('input-e3-kwh').placeholder = isSixPeriods ? 'E3' : 'E3 (Valle)';
         }
 
         function selectTariffType(type) {
@@ -995,11 +1029,10 @@
                 // --- FIX: 3.0TD/6.1TD always manual (Issue 2) ---
                 if (config.requiresQR) { // 2.0TD
                     qrButtonsContainer.classList.remove('hidden');
-                    document.getElementById('manual-input-btn').classList.add('mt-3');
+                    // manual input button has mt-3 if QR is present
                     document.getElementById('scan-instruction-text').textContent = "Escanea el código QR o introduce datos manualmente.";
                 } else { // 3.0TD, 6.1TD (Siempre manual)
                     qrButtonsContainer.classList.add('hidden');
-                    document.getElementById('manual-input-btn').classList.remove('mt-3');
                     document.getElementById('scan-instruction-text').textContent = "Introduce los datos de la factura manualmente.";
                     document.getElementById('qr-toggle-checkbox').checked = false;
                     document.getElementById('qr-content-wrapper').classList.remove('active');
@@ -1007,6 +1040,9 @@
 
                 document.getElementById('current-tariff-label').textContent = config.label;
                 document.getElementById('app-subtitle').textContent = `Comparador ${config.label}`;
+                
+                // Aplicar estilos de botón manual antes de la vista
+                applyBrandStyles(activeBrand);
                 
                 // Mostrar/Ocultar inputs P3-P6/E4-E6
                 toggleMultiCupsInputPeriods(currentTariffType, 'input');
@@ -1161,8 +1197,13 @@
         function compareOffers(data) {
             const tariffType = currentTariffType;  
             const tariffsToCompare = currentTariffs[tariffType] || [];
+            
+            const totalEnergy = Object.keys(data).filter(k => k.startsWith('consumo')).reduce((sum, key) => sum + (data[key] || 0), 0);
+            const totalPower = (data.potencia_p1_kw || 0) + (data.potencia_p2_kw || 0);
 
             if (tariffsToCompare.length === 0) return window.showErrorModal(`Las tarifas ${tariffType} no están cargadas.`);
+            
+            if (totalEnergy === 0 && totalPower === 0) return window.showErrorModal("Introduce al menos Potencia (P1 o P2) o Consumo (E1) para realizar la simulación.");
 
             const results = tariffsToCompare.map(t => calculateTariffCost(t, data, tariffType));
             
@@ -1310,18 +1351,18 @@
             if (type === '2.0TD') {
                 // 2.0TD: QR and Manual
                 qrButtonsContainer.classList.remove('hidden');
-                manualInputBtn.classList.add('mt-3');
                 scanInstructionText.textContent = "Escanea el código QR (2.0TD) o introduce datos manualmente.";
             } else if (type === '3.0TD') {
                 // 3.0TD: ONLY Manual
                 qrButtonsContainer.classList.add('hidden');
-                manualInputBtn.classList.remove('mt-3');
                 scanInstructionText.textContent = "Introduce los datos de la factura 3.0TD manualmente.";
             }
             
             manualInputBtn.textContent = "AÑADIR SUMINISTRO MANUAL";
-            // Asegurarse de aplicar los estilos correctos al botón manual
+            
+            // 4. Aplicar estilos de botón (llama a applyBrandStyles y actualiza el color del botón manual)
             applyBrandStyles(activeBrand);  
+            
             // Ocultar status de carga, ya que ya están cargadas desde la vista SAGA
             document.getElementById('loading-status').classList.add('hidden');
         }
@@ -1346,23 +1387,24 @@
 
                 // Acumulación de Potencias y Energías (para el desglose detallado)
                 const type = current.originalTariffType;
+                const normalizedType = type === '6.1TD' ? '3.0TD' : type;
                 
                 // General Power Accumulation (P1-P6)
                 for (let i = 1; i <= 6; i++) {
                     const kwKey = `potencia_p${i}_kw`;
-                    acc.aggregatedData[type].power[`p${i}`] += current[kwKey] || 0;
+                    acc.aggregatedData[normalizedType].power[`p${i}`] += current[kwKey] || 0;
                 }
 
                 // General Energy Accumulation (E1-E6)
                 // Use consumption names based on the type, but store generically
-                if (type === '2.0TD') {
-                    acc.aggregatedData[type].energy.e1 += current.consumo_punta || 0;
-                    acc.aggregatedData[type].energy.e2 += current.consumo_llano || 0;
-                    acc.aggregatedData[type].energy.e3 += current.consumo_valle || 0;
-                } else if (type === '3.0TD' || type === '6.1TD') {
+                if (normalizedType === '2.0TD') {
+                    acc.aggregatedData[normalizedType].energy.e1 += current.consumo_punta || 0;
+                    acc.aggregatedData[normalizedType].energy.e2 += current.consumo_llano || 0;
+                    acc.aggregatedData[normalizedType].energy.e3 += current.consumo_valle || 0;
+                } else if (normalizedType === '3.0TD') {
                     for (let i = 1; i <= 6; i++) {
                         // For 3.0TD/6.1TD, fields are named consumo_p1 to consumo_p6
-                        acc.aggregatedData[type].energy[`e${i}`] += current[`consumo_p${i}`] || 0;
+                        acc.aggregatedData[normalizedType].energy[`e${i}`] += current[`consumo_p${i}`] || 0;
                     }
                 }
                 
@@ -1382,15 +1424,11 @@
             total.savings = total.originalBillAnnual - total.totalAnnual;
 
             // 3. Determinar la Oferta de Referencia para el resumen
-            const bestDrkOffer = currentTariffs['2.0TD']?.find(t => t.isDrk) || { name: 'Oferta DRK', description: 'Consolidada para múltiples CUPS', isDrk: true };
+            const bestOverallWinner = multiCupsData.reduce((best, current) => {
+                if (current.savings > best.savings) return { savings: current.savings, offer: current.offer };
+                return best;
+            }, { savings: 0, offer: BRANDS.DRK.NAME.includes('DRK') ? (currentTariffs['2.0TD']?.find(t => t.isDrk) || { name: 'Oferta DRK', description: 'Consolidada' }) : { name: 'Resultado Consolidado', description: 'Power Cup Global' } });
 
-            // 4. Calcular el consumo total acumulado (solo para mostrar en la sección de datos extraídos)
-            const totalConsumptions = {
-                 consumo_punta: total.aggregatedData['2.0TD'].energy.e1,
-                 consumo_llano: total.aggregatedData['2.0TD'].energy.e2,
-                 consumo_valle: total.aggregatedData['2.0TD'].energy.e3,
-                 // Potencies are harder to aggregate meaningfully across different tariffs for a single total
-            };
 
             const finalResult = {
                 cups: `${multiCupsData.length} CUPS`, // String for display
@@ -1400,17 +1438,23 @@
                 originalBillAnnual: total.originalBillAnnual,
                 totalAnnual: total.totalAnnual,
                 savings: total.savings,
-                offer: bestDrkOffer,
+                offer: bestOverallWinner.offer, // Use the offer name from the single best saving CUPS for the header display
                 isMulti: true,
-                totalConsumptions: totalConsumptions, // Usamos la versión simplificada 2.0TD-centric para el resumen rápido
+                totalConsumptions: { 
+                    consumo_punta: total.aggregatedData['2.0TD'].energy.e1,
+                    consumo_llano: total.aggregatedData['2.0TD'].energy.e2,
+                    consumo_valle: total.aggregatedData['2.0TD'].energy.e3,
+                },
                 individualResults: multiCupsData, // Añadir resultados individuales para el desglose HTML
                 aggregatedData: total.aggregatedData
             };
             
             lastComparisonResult = finalResult;
             
-            // Siempre usamos branding DRK para la vista MultiCups (según la lógica de la compañía)
-            applyBrandStyles(BRANDS.DRK);
+            // Set the active brand for the UI based on the comparison mode
+            const brandToApply = comparisonMode === 'overall_best' ? BRANDS.POWER_CUP : BRANDS.DRK;
+            applyBrandStyles(brandToApply);
+            
             renderMultiResultsUI(finalResult);
             
             document.getElementById('initial-view').classList.add('hidden');
@@ -1421,20 +1465,18 @@
         }
 
 
-        // --- UI RENDERIZADO (MODIFICADO para incluir Comercializadora - Tarifa) ---
-
         /**
          * Rellena la vista de resultados con los datos acumulados para MULTICUPS.
          * @param {Object} res - Resultado final de la comparación acumulada.
          */
         function renderMultiResultsUI(res) {
             const offer = res.offer;
-            const brand = activeBrand;
+            let brand = activeBrand; // Use activeBrand set by comparisonMode
             const individualResults = res.individualResults;
-            const aggregatedData = res.aggregatedData; // Nuevo
+            const aggregatedData = res.aggregatedData;
             
             // FIX: Usar funciones robustas contra NaN
-            const eur = n => new Intl.NumberFormat('es-ES', { style: 'currency', currency: 'EUR' }).format(n || 0);
+            const eur = n => new Intl.NumberFormat('es-ES', { style: 'currency', currency: 'EUR', minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(n || 0);
             const num = (n, d=2) => new Intl.NumberFormat('es-ES', { minimumFractionDigits: d, maximumFractionDigits: d }).format(n || 0);
             const numPriceFormula = (n) => new Intl.NumberFormat('es-ES', { minimumFractionDigits: 6, maximumFractionDigits: 6 }).format(n || 0);
             
@@ -1466,7 +1508,7 @@
             } else {
                 savingsEl.textContent = eur(res.savings);
                 savingsEl.classList.add('text-green-500');
-                newCostLabelEl.textContent = `TU NUEVO COSTE DRK CONSOLIDADO`;
+                newCostLabelEl.textContent = `TU NUEVO COSTE ${brand.NAME.includes('DRK') ? 'DRK' : 'POWER CUP'} CONSOLIDADO`;
                 oldCostPeriodEl.classList.add('line-through', 'text-red-400', 'decoration-red-400/50');
                 oldCostAnnualEl.classList.add('line-through', 'text-red-500', 'decoration-red-500/50');
             }
@@ -1499,8 +1541,7 @@
             `;
 
 
-            // 3. Datos Acumulados Agrupados por Tarifa (FIX: Bug 3)
-            // Calcular el total de energía sumando todos los consumos en los datos agregados
+            // 3. Datos Acumulados Agrupados por Tarifa
             let totalEnergy = 0;
             Object.keys(aggregatedData).forEach(type => {
                 Object.values(aggregatedData[type].energy).forEach(kwh => {
@@ -1512,7 +1553,6 @@
             function generateGroupedDataHTML(type, data, powerPeriods, energyPeriods) {
                 const is20TD = type === '2.0TD';
                 
-                // Verificar si hay datos significativos para este grupo
                 const hasPower = Object.values(data.power).slice(0, powerPeriods).some(v => v > 0);
                 const hasEnergy = Object.values(data.energy).slice(0, energyPeriods).some(v => v > 0);
                 
@@ -1560,7 +1600,6 @@
 
             let accumulatedSectionsHTML = '';
             accumulatedSectionsHTML += generateGroupedDataHTML('2.0TD', aggregatedData['2.0TD'], 2, 3);  
-            // 3.0TD y 6.1TD comparten el mismo ID de hoja y estructura de 6 períodos/potencias
             accumulatedSectionsHTML += generateGroupedDataHTML('3.0TD', aggregatedData['3.0TD'], 6, 6);  
 
             const correctedConsumptionHTML = `
@@ -1575,48 +1614,65 @@
                 </div>
             `;
 
-            // 4. Precios de la Oferta Consolidada (DRK Energía) - FIX: Solo renderizar si hay CUPS de ese tipo
-            const { best20TD, best30TD } = getConsolidatedDrkPrices();
-            const has20TD = individualResults.some(d => d.originalTariffType === '2.0TD');
-            const has30TD = individualResults.some(d => d.originalTariffType === '3.0TD' || d.originalTariffType === '6.1TD'); // Incluir 6.1TD en 3.0TD prices check (assuming they share a sheet/price structure)
-
+            // --- 4. Precios de la Oferta Consolidada (Dynamic Winner) ---
+            const { winningOffers, hasDrkWinner } = getWinningOffersPerType(individualResults);
             let tariffPricesHTML = '';
-            const drkPrimaryText = brand.PRIMARY_TEXT;
-            const drkPrices = [];
+            const consolidatedPrices = [];
+            const brandPrimaryText = brand.PRIMARY_TEXT;
+            const isPowerCupMode = comparisonMode === 'overall_best';
 
-            // Add 2.0TD Prices (P1-P2, E1-E3) ONLY if a 2.0TD CUPS was added
-            if (best20TD && has20TD) {
-                const fullTariffName20 = `${best20TD.name || 'DRK Tarifa 2.0TD'} - ${best20TD.description || 'N/A'}`; // MODIFICACIÓN
-                drkPrices.push(`
-                    <div class="mb-4 p-3 bg-white rounded-lg border border-drk-100">
-                        <h5 class="font-black text-sm text-drk-800 border-b pb-1 mb-2">Tarifa 2.0 TD (Hogar/Negocio) - ${fullTariffName20}</h5>
+            // Determine the label for the price section
+            const priceSectionLabel = (isPowerCupMode && !hasDrkWinner) 
+                ? 'Precios de la Oferta Ganadora Consolidada (POWER CUP GLOBAL)' 
+                : 'Precios de la Oferta Consolidada (DRK Energía)';
+
+            const basePrefix = brand.NAME.includes('DRK') ? 'drk' : 'powercup';
+            const color800 = brand.PRIMARY_TEXT.split('-')[1] || 'slate-800'; // Get dynamic color text-drk-800 -> drk-800
+
+            // Add 2.0TD Prices (P1-P2, E1-E3)
+            const offer20 = winningOffers['2.0TD'];
+            const has20TD = individualResults.some(d => d.originalTariffType === '2.0TD');
+            if (offer20 && has20TD && offer20.name !== 'Tu Tarifa Actual') {
+                const fullTariffName20 = `${offer20.name || 'Tarifa 2.0TD'} - ${offer20.description || 'N/A'}`;
+                
+                const p1 = offer20.p_potencia_1 / 365;
+                const p2 = offer20.p_potencia_2 / 365;
+                const e1 = offer20.p1_price;
+                const e2 = offer20.p2_price;
+                const e3 = offer20.p3_price;
+
+                consolidatedPrices.push(`
+                    <div class="mb-4 p-3 bg-white rounded-lg border border-${basePrefix}-100">
+                        <h5 class="font-black text-sm text-${color800} border-b pb-1 mb-2">Tarifa 2.0 TD (Hogar/Negocio) - ${fullTariffName20}</h5>
                         <div class="grid grid-cols-2 gap-x-4 text-xs">
-                            <p class="text-slate-500">P1 (€/kW/día):</p><p class="font-mono font-bold text-right">${numPriceFormula(best20TD.p_potencia_1 / 365)}</p>
-                            <p class="text-slate-500">P2 (€/kW/día):</p><p class="font-mono font-bold text-right">${numPriceFormula(best20TD.p_potencia_2 / 365)}</p>
+                            <p class="text-slate-500">P1 (€/kW/día):</p><p class="font-mono font-bold text-right">${numPriceFormula(p1)}</p>
+                            <p class="text-slate-500">P2 (€/kW/día):</p><p class="font-mono font-bold text-right">${numPriceFormula(p2)}</p>
                             <p class="text-slate-500 mt-2 col-span-2 font-bold text-green-600">ENERGÍA (€/kWh)</p>
-                            <p class="text-slate-500">E1 (Punta):</p><p class="font-mono font-bold text-right">${numPriceFormula(best20TD.p1_price)}</p>
-                            <p class="text-slate-500">E2 (Llano):</p><p class="font-mono font-bold text-right">${numPriceFormula(best20TD.p2_price)}</p>
-                            <p class="text-slate-500">E3 (Valle):</p><p class="font-mono font-bold text-right">${numPriceFormula(best20TD.p3_price)}</p>
+                            <p class="text-slate-500">E1 (Punta):</p><p class="font-mono font-bold text-right">${numPriceFormula(e1)}</p>
+                            <p class="text-slate-500">E2 (Llano):</p><p class="font-mono font-bold text-right">${numPriceFormula(e2)}</p>
+                            <p class="text-slate-500">E3 (Valle):</p><p class="font-mono font-bold text-right">${numPriceFormula(e3)}</p>
                         </div>
                     </div>
                 `);
             }
 
-            // Add 3.0TD Prices (P1-P6, E1-E6) ONLY if a 3.0TD or 6.1TD CUPS was added
-            if (best30TD && has30TD) {
+            // Add 3.0TD Prices (P1-P6, E1-E6)
+            const offer30 = winningOffers['3.0TD'];
+            const has30TD = individualResults.some(d => d.originalTariffType === '3.0TD' || d.originalTariffType === '6.1TD');
+            if (offer30 && has30TD && offer30.name !== 'Tu Tarifa Actual') {
                 let pRows = '';
                 for(let i=1; i<=6; i++) {
-                    pRows += `<p class="text-slate-500">P${i}:</p><p class="font-mono font-bold text-right">${numPriceFormula(best30TD[`p_potencia_${i}`] / 365)}</p>`;
+                    pRows += `<p class="text-slate-500">P${i}:</p><p class="font-mono font-bold text-right">${numPriceFormula(offer30[`p_potencia_${i}`] / 365)}</p>`;
                 }
                 let eRows = '';
                 for(let i=1; i<=6; i++) {
-                    eRows += `<p class="text-slate-500">E${i}:</p><p class="font-mono font-bold text-right">${numPriceFormula(best30TD[`p${i}_price`])}</p>`;
+                    eRows += `<p class="text-slate-500">E${i}:</p><p class="font-mono font-bold text-right">${numPriceFormula(offer30[`p${i}_price`])}</p>`;
                 }
-                const fullTariffName30 = `${best30TD.name || 'DRK Tarifa 3.0TD/6.1TD'} - ${best30TD.description || 'N/A'}`; // MODIFICACIÓN
+                const fullTariffName30 = `${offer30.name || 'Tarifa 3.0TD/6.1TD'} - ${offer30.description || 'N/A'}`;
 
-                drkPrices.push(`
-                    <div class="mb-4 p-3 bg-white rounded-lg border border-drk-100">
-                        <h5 class="font-black text-sm text-drk-800 border-b pb-1 mb-2">Tarifa 3.0 TD / 6.1 TD (Industria/Consumo) - ${fullTariffName30}</h5>
+                consolidatedPrices.push(`
+                    <div class="mb-4 p-3 bg-white rounded-lg border border-${basePrefix}-100">
+                        <h5 class="font-black text-sm text-${color800} border-b pb-1 mb-2">Tarifa 3.0 TD / 6.1 TD (Industria/Consumo) - ${fullTariffName30}</h5>
                         <div class="grid grid-cols-2 md:grid-cols-4 gap-x-4 text-xs">
                             <div class="col-span-2 md:col-span-4 font-bold text-red-600 mb-1">POTENCIA (€/kW/día)</div>
                             ${pRows}
@@ -1627,12 +1683,12 @@
                 `);
             }
 
-            if (drkPrices.length > 0) {
+            if (consolidatedPrices.length > 0) {
                 tariffPricesHTML = `
                     <div class="bg-slate-50 p-4 rounded-xl border border-slate-200 shadow-sm text-sm mb-6">
-                        <h4 class="font-bold text-lg ${drkPrimaryText} mb-3">Precios de la Oferta Consolidada (DRK Energía)</h4>
-                        ${drkPrices.join('')}
-                        <p class="text-xs text-slate-500 mt-2">*Los precios mostrados son de las mejores ofertas DRK detectadas para cada tipo de tarifa y se aplican a las CUPS añadidas.</p>
+                        <h4 class="font-bold text-lg ${brandPrimaryText} mb-3">${priceSectionLabel}</h4>
+                        ${consolidatedPrices.join('')}
+                        <p class="text-xs text-slate-500 mt-2">*Los precios mostrados son de las ofertas ganadoras detectadas para cada tipo de tarifa y se aplican a las CUPS añadidas.</p>
                     </div>
                 `;
             }
@@ -1671,8 +1727,8 @@
                      if (p.period <= powerPeriods) {
                          powerBreakdown += `<div class="flex justify-between"><span>P${p.period} (${num(p.kw, 2)} kW x ${numPriceFormula(p.priceDay)} €/día)</span><span>${num(p.cost, 2)} €</span></div>`;
                     }
-                 });
-                        
+                     });
+                                 
                 const statusText = resItem.isNegativeSavings ?  
                     `<p class="text-sm font-bold text-red-600 mb-2">⚠️ TU TARIFA ACTUAL es la mejor</p>` :
                     `<p class="text-sm font-bold text-green-600 mb-2">💰 AHORRO ANUAL: ${eur(resItem.savings)}</p>`;
@@ -1740,7 +1796,7 @@
             const config = TARIFF_CONFIG[tariffType];
 
             // FIX: Usar funciones robustas contra NaN
-            const eur = n => new Intl.NumberFormat('es-ES', { style: 'currency', currency: 'EUR' }).format(n || 0);
+            const eur = n => new Intl.NumberFormat('es-ES', { style: 'currency', currency: 'EUR', minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(n || 0);
             const num = (n, d=2) => new Intl.NumberFormat('es-ES', { minimumFractionDigits: d, maximumFractionDigits: d }).format(n || 0);
             const numPriceFormula = (n) => new Intl.NumberFormat('es-ES', { minimumFractionDigits: 6, maximumFractionDigits: 6 }).format(n || 0);
             
@@ -2227,16 +2283,26 @@
             const num = (n, d=2) => new Intl.NumberFormat('es-ES', { minimumFractionDigits: d, maximumFractionDigits: d }).format(n || 0);
             const numPriceFormula = (n) => new Intl.NumberFormat('es-ES', { minimumFractionDigits: 6, maximumFractionDigits: 6 }).format(n || 0);
             
-            // Colores DRK
             const DRK_DARK = '#0c4a6e'; const DRK_MED = '#075985'; const DRK_CTA = '#0284c7';
-            const D_PRIMARY_DARK = DRK_DARK;
-            const D_PRIMARY_MED = DRK_MED;
-            const D_ACCENT_CTA = DRK_CTA;
-            const D_BRAND_NAME = 'DRK';
+            const PC_DARK = '#3f6212'; const PC_MED = '#65a30d'; const PC_CTA = '#84cc16';
+
+            // --- Determine Dynamic Branding for Email Copy ---
+            const { winningOffers, hasDrkWinner } = getWinningOffersPerType(individualResults);
+
+            let dynamicBrand = BRANDS.DRK;
+            if (comparisonMode === 'overall_best' && !hasDrkWinner) {
+                dynamicBrand = BRANDS.POWER_CUP;
+            }
+
+            const D_PRIMARY_DARK = dynamicBrand.NAME.includes('DRK') ? DRK_DARK : PC_DARK;
+            const D_PRIMARY_MED = dynamicBrand.NAME.includes('DRK') ? DRK_MED : PC_MED;
+            const D_ACCENT_CTA = dynamicBrand.NAME.includes('DRK') ? DRK_CTA : PC_CTA;
+            const D_BRAND_NAME = dynamicBrand.NAME;
+            const BG_LIGHT = dynamicBrand.NAME.includes('DRK') ? '#f0f9ff' : '#f7fee7';  
+
             const ZONA_GEOGRAFICA = "PENINSULA"; // HARDCODED AS REQUESTED
 
             const RED_CTA = '#CC0000';
-            const BG_LIGHT = '#f0f9ff'; // drk-50
             const GREEN_SAVE = '#16a34a';
 
             const clientName = document.getElementById('client-name-input').value.trim() || '[NOMBRE COMPLETO CLIENTE]';
@@ -2253,9 +2319,8 @@
                 const powerPeriods = currentConfig.powerPeriods;
                 
                 // Determinar el nombre de la tarifa final aplicada
-                // MODIFICACIÓN: Usar Comercializadora - Tarifa para ofertas DRK.
-                const appliedOfferName = resItem.offer.isDrk 
-                    ? `${resItem.offer.name} - ${resItem.offer.description}` 
+                const appliedOfferName = resItem.offer.isDrk  
+                    ? `${resItem.offer.name} - ${resItem.offer.description}`  
                     : resItem.offer.name;
 
                 // Desglose: Potencia
@@ -2351,48 +2416,58 @@
             const formalizationRecipients = 'f.araujo@drk.es,r.guerra@drk.es,s.caballero@drk.es';  
             const formalizationLink = `mailto:${formalizationRecipients}?subject=${encodeURIComponent(subject)}&body=${emailBody}`;
 
-            // --- Precios de la Oferta Consolidada (DRK ENERGÍA) ---
-            const { best20TD: offer20, best30TD: offer30 } = getConsolidatedDrkPrices();
-            const has20TD = individualResults.some(d => d.originalTariffType === '2.0TD');
-            const has30TD = individualResults.some(d => d.originalTariffType === '3.0TD' || d.originalTariffType === '6.1TD');
-
-            let preciosConsolidadosHTML = '';
+            // --- Precios de la Oferta Consolidada (Dynamic Winner) ---
             
+            let preciosConsolidadosHTML = '';
+            const priceSectionHeader = dynamicBrand.NAME.includes('DRK')
+                ? 'PRECIOS DE LA OFERTA CONSOLIDADA (DRK ENERGÍA)'
+                : 'PRECIOS DE LA OFERTA GANADORA CONSOLIDADA (POWER CUP GLOBAL)';
+
             // 2.0TD Prices
-            if (offer20 && has20TD) {  
-                const fullTariffName20 = `${offer20.name || 'DRK Tarifa 2.0TD'} - ${offer20.description || 'N/A'}`; // MODIFICACIÓN
+            const offer20 = winningOffers['2.0TD'];
+            const has20TD = individualResults.some(d => d.originalTariffType === '2.0TD');
+            if (offer20 && has20TD && offer20.name !== 'Tu Tarifa Actual') {
+                const fullTariffName20 = `${offer20.name || 'Tarifa 2.0TD'} - ${offer20.description || 'N/A'}`; 
+                const p1 = offer20.p_potencia_1 / 365;
+                const p2 = offer20.p_potencia_2 / 365;
+                const e1 = offer20.p1_price;
+                const e2 = offer20.p2_price;
+                const e3 = offer20.p3_price;
+                
                 preciosConsolidadosHTML += `
                     <div style="margin-top: 15px; padding: 10px; background-color: #ffffff; border: 1px solid #ddd; border-radius: 6px;">
                         <p style="margin: 0 0 5px 0; font-weight: bold; font-size: 13px; color: ${D_PRIMARY_DARK};">Tarifa 2.0 TD (Hogar/Negocio) - ${fullTariffName20}</p>
                         <table width="100%" cellpadding="0" cellspacing="0" style="font-family: Arial, sans-serif; font-size: 11px; table-layout: fixed;">
-                            <tr><td style="padding: 2px 0; width: 60%;">P1 (€/kW/día):</td><td style="text-align: right; font-weight: bold; font-family: monospace;">${numPriceFormula(offer20.p_potencia_1 / 365)}</td></tr>
-                            <tr><td style="padding: 2px 0;">P2 (€/kW/día):</td><td style="text-align: right; font-weight: bold; font-family: monospace;">${numPriceFormula(offer20.p_potencia_2 / 365)}</td></tr>
+                            <tr><td style="padding: 2px 0; width: 60%; color: #555;">P1 (€/kW/día):</td><td style="text-align: right; font-weight: bold; font-family: monospace; color: #333;">${numPriceFormula(p1)}</td></tr>
+                            <tr><td style="padding: 2px 0; color: #555;">P2 (€/kW/día):</td><td style="text-align: right; font-weight: bold; font-family: monospace; color: #333;">${numPriceFormula(p2)}</td></tr>
                             <tr style="height: 5px;"><td colspan="2"></td></tr>
-                            <tr><td style="padding: 2px 0;">E1 (Punta - €/kWh):</td><td style="text-align: right; font-weight: bold; font-family: monospace;">${numPriceFormula(offer20.p1_price)}</td></tr>
-                            <tr><td style="padding: 2px 0;">E2 (Llano - €/kWh):</td><td style="text-align: right; font-weight: bold; font-family: monospace;">${numPriceFormula(offer20.p2_price)}</td></tr>
-                            <tr><td style="padding: 2px 0;">E3 (Valle - €/kWh):</td><td style="text-align: right; font-weight: bold; font-family: monospace;">${numPriceFormula(offer20.p3_price)}</td></tr>
+                            <tr><td style="padding: 2px 0; font-weight: bold; color: ${GREEN_SAVE};">ENERGÍA E1 (Punta - €/kWh):</td><td style="text-align: right; font-weight: bold; font-family: monospace; color: ${GREEN_SAVE};">${numPriceFormula(e1)}</td></tr>
+                            <tr><td style="padding: 2px 0; font-weight: bold; color: ${GREEN_SAVE};">ENERGÍA E2 (Llano - €/kWh):</td><td style="text-align: right; font-weight: bold; font-family: monospace; color: ${GREEN_SAVE};">${numPriceFormula(e2)}</td></tr>
+                            <tr><td style="padding: 2px 0; font-weight: bold; color: ${GREEN_SAVE};">ENERGÍA E3 (Valle - €/kWh):</td><td style="text-align: right; font-weight: bold; font-family: monospace; color: ${GREEN_SAVE};">${numPriceFormula(e3)}</td></tr>
                         </table>
                     </div>
                 `;
             }
 
             // 3.0TD Prices (P1-P6, E1-E6)
-            if (offer30 && has30TD) {
+            const offer30 = winningOffers['3.0TD'];
+            const has30TD = individualResults.some(d => d.originalTariffType === '3.0TD' || d.originalTariffType === '6.1TD');
+            if (offer30 && has30TD && offer30.name !== 'Tu Tarifa Actual') {
                 let pRows = '';
                 for(let i=1; i<=6; i++) {
-                    pRows += `<tr><td style="padding: 2px 0;">P${i} (€/kW/día):</td><td style="text-align: right; font-weight: bold; font-family: monospace;">${numPriceFormula(offer30[`p_potencia_${i}`] / 365)}</td></tr>`;
+                    pRows += `<tr><td style="padding: 2px 0; color: #555;">P${i} (€/kW/día):</td><td style="text-align: right; font-weight: bold; font-family: monospace; color: #333;">${numPriceFormula(offer30[`p_potencia_${i}`] / 365)}</td></tr>`;
                 }
                 let eRows = '';
                 for(let i=1; i<=6; i++) {
-                    eRows += `<tr><td style="padding: 2px 0;">E${i} (€/kWh):</td><td style="text-align: right; font-weight: bold; font-family: monospace;">${numPriceFormula(offer30[`p${i}_price`])}</p></td></tr>`;
+                    eRows += `<tr><td style="padding: 2px 0; font-weight: bold; color: ${GREEN_SAVE};">E${i} (€/kWh):</td><td style="text-align: right; font-weight: bold; font-family: monospace; color: ${GREEN_SAVE};">${numPriceFormula(offer30[`p${i}_price`])}</p></td></tr>`;
                 }
-                const fullTariffName30 = `${offer30.name || 'DRK Tarifa 3.0TD/6.1TD'} - ${offer30.description || 'N/A'}`; // MODIFICACIÓN
+                const fullTariffName30 = `${offer30.name || 'Tarifa 3.0TD/6.1TD'} - ${offer30.description || 'N/A'}`;
 
                 preciosConsolidadosHTML += `
                     <div style="margin-top: 15px; padding: 10px; background-color: #ffffff; border: 1px solid #ddd; border-radius: 6px;">
                         <p style="margin: 0 0 5px 0; font-weight: bold; font-size: 13px; color: ${D_PRIMARY_DARK};">Tarifa 3.0 TD / 6.1 TD (Industria/Consumo) - ${fullTariffName30}</p>
                         <table width="100%" cellpadding="0" cellspacing="0" style="font-family: Arial, sans-serif; font-size: 11px; table-layout: fixed;">
-                            <tr><td colspan="2" style="font-weight: bold; color: #CC0000; padding: 5px 0 2px 0;">POTENCIA</td></tr>
+                            <tr><td colspan="2" style="font-weight: bold; color: ${RED_CTA}; padding: 5px 0 2px 0;">POTENCIA</td></tr>
                             ${pRows}
                             <tr><td colspan="2" style="font-weight: bold; color: ${GREEN_SAVE}; padding: 5px 0 2px 0; border-top: 1px dashed #ccc; margin-top: 5px;">ENERGÍA</td></tr>
                             ${eRows}
@@ -2402,7 +2477,7 @@
             }
             
             const preciosResumenSection = preciosConsolidadosHTML ? `
-                <tr><td colspan="2"><div style="background-color: ${D_PRIMARY_MED}; color: white; font-weight: bold; padding: 8px; font-size: 14px; margin-top: 10px;">PRECIOS DE LA OFERTA CONSOLIDADA (DRK ENERGÍA)</div></td></tr>
+                <tr><td colspan="2"><div style="background-color: ${D_PRIMARY_MED}; color: white; font-weight: bold; padding: 8px; font-size: 14px; margin-top: 10px;">${priceSectionHeader}</div></td></tr>
                 <tr><td colspan="2" style="padding: 0 20px 20px 20px;">
                     ${preciosConsolidadosHTML}
                 </td></tr>
@@ -2455,7 +2530,7 @@
                                     <div style="font-size: 11px; color: #666;">/ AÑO</div>
                                 </td>
                                 <td style="width: 50%; padding: 15px; background-color: ${BG_LIGHT}; border: 1px solid ${D_PRIMARY_MED}; text-align: center; vertical-align: top;">
-                                    <div style="font-size: 11px; font-weight: bold; color: ${D_PRIMARY_MED}; text-transform: uppercase;">NUEVO COSTE DRK ANUAL</div>
+                                    <div style="font-size: 11px; font-weight: bold; color: ${D_PRIMARY_MED}; text-transform: uppercase;">NUEVO COSTE ${D_BRAND_NAME.toUpperCase()} ANUAL</div>
                                     <div style="font-size: 24px; font-weight: bold; color: ${D_PRIMARY_DARK}; margin: 5px 0; white-space: nowrap;">${eur(bd.totalAnnual)}</div>
                                     <div style="font-size: 11px; color: ${D_PRIMARY_MED};">/ AÑO</div>
                                     <div style="font-size: 13px; font-weight: bold; color: ${D_PRIMARY_DARK}; margin-top: 5px; white-space: nowrap;">${eur(bd.totalAnnual/12)} / MES</div>
@@ -2509,8 +2584,14 @@
             data['consumo_valle'] = data.consumo_p3;
             
             
-            if (data.importe_total <= 0) return window.showErrorModal("Introduce el total de la factura.");
+            // --- VALIDACIÓN DE DATOS ---
+            const totalEnergy = Object.keys(data).filter(k => k.startsWith('consumo_')).reduce((sum, key) => sum + (data[key] || 0), 0);
+            const totalPower = Object.keys(data).filter(k => k.startsWith('potencia_')).reduce((sum, key) => sum + (data[key] || 0), 0);
             
+            if (data.importe_total <= 0) return window.showErrorModal("Introduce el total de la factura.");
+            if (totalEnergy === 0 && totalPower === 0) return window.showErrorModal("Introduce al menos Potencia (P1 o P2) o Consumo (E1) para realizar la simulación.");
+            // --- FIN VALIDACIÓN ---
+
             closeManualInputModal();
             
             if (isMultiCupsMode) {
@@ -2656,7 +2737,7 @@
             document.getElementById('qr-toggle-checkbox').addEventListener('change', (e) => {
                 const wrapper = document.getElementById('qr-content-wrapper');
                 if (e.target.checked) {
-                    generateQRCode(activeBrand);  
+                    generateQRCode(activeBrand);
                     wrapper.classList.add('active');
                 } else {
                     wrapper.classList.remove('active');
@@ -2847,7 +2928,7 @@
                      document.getElementById('manual-input-modal').classList.remove('hidden');
                      document.getElementById('manual-input-modal').classList.add('flex');
                 } else {
-                     window.showErrorModal("Las tarifas no han cargado aún. Por favor, intente de nuevo.");
+                    window.showErrorModal("Las tarifas no han cargado aún. Por favor, intente de nuevo.");
                 }
             }
         }
@@ -2867,7 +2948,7 @@
                 modal.querySelector('h3').textContent = `Confirmar Suministro MultiCups`; // NEW: Adjust title for MultiCups
             } else {
                  // Modo Individual, solo opciones completas
-                 selectEl.innerHTML = `<option value="2.0TD">2.0 TD (Punta, Llano, Valle)</option><option value="3.0TD">3.0 TD (6 Periodos)</option>`;
+                 selectEl.innerHTML = `<option value="2.0TD">2.0 TD (Punta, Llano, Valle)</option><option value="3.0TD">3.0 TD (6 Periodos)</option><option value="6.1TD">6.1 TD (6 Periodos)</option>`;
                  selectEl.value = data.originalTariffType;  
                  modal.querySelector('h3').textContent = `Confirmar Suministro`; // Reset title for Individual
             }
@@ -2974,7 +3055,7 @@
                 // Best DRK is the DRK one with the lowest annual cost
                 if (r.offer.isDrk) {
                     if (!bestDrk || annualCost < bestDrk.totalAnnual) {
-                         bestDrk = r;
+                          bestDrk = r;
                     }
                 }
             });
@@ -3069,8 +3150,11 @@
              if (lines.length < 2) return [];
              
              const rawHeader = lines[0];
-             const delimiter = rawHeader.includes(';') ? ';' : ',';
-             
+             // More robust delimiter detection: assume ; if the first line contains more ; than ,
+             let semicolonCount = (rawHeader.match(/;/g) || []).length;
+             let commaCount = (rawHeader.match(/,/g) || []).length;
+             const delimiter = semicolonCount > commaCount ? ';' : ',';
+
              const headers = rawHeader.split(delimiter).map(h => h.trim().toLowerCase().replace(/"/g, ''));
              const data = [];
 
@@ -3078,14 +3162,9 @@
                  const row = lines[i].trim();
                  if(!row) continue;
                  
-                 const regex = new RegExp(`(?:^|${delimiter})(\"(?:[^\"]|\"\")*\"|[^${delimiter}]*)`,"g");
-                 const values = [];
-                 let match = null;
-                 regex.lastIndex = 0;  
-                 while(match = regex.exec(row)){
-                     let val = match[1].replace(/^"|"$/g, '').replace(/""/g, '"');
-                     values.push(val);
-                 }
+                 // Use a simpler split for parsing values, since the regex used for quoted fields
+                 // is complex and often unnecessary for simple CSVs from Google Sheets.
+                 const values = row.split(delimiter).map(v => v.trim().replace(/^"|"$/g, '').replace(/""/g, '"'));
 
                  if(values.length < 2) continue;
 
