@@ -1,4 +1,4 @@
-
+<html lang="es">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -1970,6 +1970,7 @@
             const D_PRIMARY_MED = brand.NAME.includes('DRK') ? DRK_MED : PC_MED;
             const D_ACCENT_CTA = brand.NAME.includes('DRK') ? DRK_CTA : PC_CTA;
             const D_BRAND_NAME = brand.NAME;
+            const ZONA_GEOGRAFICA = "PENINSULA"; // HARDCODED AS REQUESTED
 
             const RED_CTA = '#CC0000';
             const BG_LIGHT = brand.NAME.includes('DRK') ? '#f0f9ff' : '#f7fee7';  
@@ -1997,24 +1998,33 @@
 
             const emailBody = `Hola ${D_BRAND_NAME.toUpperCase()}, confirmo la aceptación de la oferta con CUPS: ${bd.cups}.${LB}${LB}` +
                                  `--- DATOS DE LA OFERTA ---${LB}${LB}` +
-                                 `Comercializadora y Tarifa: ${commercialTariffName}${LB}` + // MODIFICADO
+                                 `Comercializadora y Tarifa: ${commercialTariffName}${LB}` + 
+                                 `Zona Geográfica: ${ZONA_GEOGRAFICA}${LB}` + // ADDED
                                  `Ahorro Anual Estimado: ${eur(bd.savings)}${LB}` +
                                  `Total Mensual Estimado: ${monthlyEstimate}${LB}` +
-                                 `Consumo Total Facturado: ${totalConsumption}${LB}` +
-                                 `${discountLine}` +  
+                                 `Consumo Total Facturado: ${totalConsumption}${LB}${LB}` +
                                  `--- DETALLE DE PRECIOS (€) ---${LB}` +
                                  `P1 (Potencia - €/kW/día): ${numPriceFormula(p1PricePerDay)}${LB}` +
                                  `P2 (Potencia - €/kW/día): ${numPriceFormula(p2PricePerDay)}${LB}` +
                                  `E1 (Energía - €/kWh): ${numPriceFormula(e1Price)}${LB}` +
                                  `E2 (Energía - €/kWh): ${numPriceFormula(e2Price)}${LB}` +
                                  `E3 (Energía - €/kWh): ${numPriceFormula(e3Price)}${LB}` +
-                                 `------------------------------${LB}${LB}` +
-                                 `DATOS DEL CLIENTE (A RELLENAR):${LB}` +
+                                 `------------------------------${LB}${LB}` +  
+                                 `${discountLine}` +  
+                                 `--- DATOS DEL CLIENTE ---${LB}` + // MATCHED USER EXAMPLE
                                  `Nombre completo: ${clientName}${LB}` +
                                  `Teléfono de contacto: ${clientPhone}${LB}` +
                                  `Email de contacto: ${clientEmail}${LB}${LB}` +
-                                 `INFORMACIÓN ADICIONAL:${LB}` +
-                                 `[AGREGUE CUALQUIER COMENTARIO EXTRA AQUÍ]${LB}${LB}`;
+                                 `--- INFORMACIÓN ADICIONAL (Opcional) ---${LB}` + // MATCHED USER EXAMPLE
+                                 `[AGREGUE CUALQUIER COMENTARIO EXTRA AQUÍ]${LB}${LB}` +
+                                 `--- DOCUMENTACIÓN REQUERIDA ---${LB}${LB}` + // ADDED
+                                 `Para formalizar el contrato, por favor, responde a este email adjuntando:${LB}${LB}` +
+                                 `1. Foto del DNI/CIF (anverso y reverso).${LB}` +
+                                 `2. Última factura (mínimo 3 meses de antigüedad).${LB}` +
+                                 `3. Email de contacto para validación.${LB}` +
+                                 `4. Teléfono de contacto.${LB}` +
+                                 `5. Número de cuenta bancaria (IBAN).${LB}${LB}` +
+                                 `Adjunto la documentación requerida.`; // ADDED FINAL SIGN-OFF
 
             const subject = `FORMALIZACIÓN DE CONTRATO - CUPS: ${bd.cups}`;
             const formalizationRecipients = 'f.araujo@drk.es,r.guerra@drk.es,s.caballero@drk.es'; // Email por defecto
@@ -2223,6 +2233,7 @@
             const D_PRIMARY_MED = DRK_MED;
             const D_ACCENT_CTA = DRK_CTA;
             const D_BRAND_NAME = 'DRK';
+            const ZONA_GEOGRAFICA = "PENINSULA"; // HARDCODED AS REQUESTED
 
             const RED_CTA = '#CC0000';
             const BG_LIGHT = '#f0f9ff'; // drk-50
@@ -2316,14 +2327,25 @@
             const emailBody = `Hola ${D_BRAND_NAME.toUpperCase()}, confirmo la aceptación de la oferta consolidada para ${individualResults.length} suministros (MULTICUPS).${LB}${LB}` +
                                  `--- RESUMEN CONSOLIDADO ---${LB}` +
                                  `Oferta Consolidada: ${consolidatedTariffName}${LB}` + // MODIFICADO
+                                 `Zona Geográfica: ${ZONA_GEOGRAFICA}${LB}` + // ADDED
                                  `Ahorro Anual Estimado: ${eur(bd.savings)}${LB}` +
                                  `Total Mensual Estimado: ${eur(bd.totalAnnual / 12)}${LB}` +
                                  `Total Suministros: ${individualResults.length}${LB}${LB}` +
                                  `DETALLE DE CUPS: ${bd.multiCupsList}${LB}${LB}` +
-                                 `DATOS DEL CLIENTE (A RELLENAR):${LB}` +
+                                 `--- DATOS DEL CLIENTE ---${LB}` + // MATCHED USER EXAMPLE
                                  `Nombre completo: ${clientName}${LB}` +
                                  `Teléfono de contacto: ${clientPhone}${LB}` +
-                                 `Email de contacto: ${clientEmail}${LB}${LB}`;
+                                 `Email de contacto: ${clientEmail}${LB}${LB}` +
+                                 `--- INFORMACIÓN ADICIONAL (Opcional) ---${LB}` + // MATCHED USER EXAMPLE
+                                 `[AGREGUE CUALQUIER COMENTARIO EXTRA AQUÍ]${LB}${LB}` +
+                                 `--- DOCUMENTACIÓN REQUERIDA ---${LB}${LB}` + // ADDED
+                                 `Para formalizar el contrato, por favor, responde a este email adjuntando:${LB}${LB}` +
+                                 `1. Foto del DNI/CIF (anverso y reverso).${LB}` +
+                                 `2. Última factura (mínimo 3 meses de antigüedad).${LB}` +
+                                 `3. Email de contacto para validación.${LB}` +
+                                 `4. Teléfono de contacto.${LB}` +
+                                 `5. Número de cuenta bancaria (IBAN).${LB}${LB}` +
+                                 `Adjunto la documentación requerida.`; // ADDED FINAL SIGN-OFF
 
             const subject = `FORMALIZACIÓN CONSOLIDADA - ${individualResults.length} CUPS`;
             const formalizationRecipients = 'f.araujo@drk.es,r.guerra@drk.es,s.caballero@drk.es';  
@@ -2362,7 +2384,7 @@
                 }
                 let eRows = '';
                 for(let i=1; i<=6; i++) {
-                    eRows += `<tr><td style="padding: 2px 0;">E${i} (€/kWh):</td><td style="text-align: right; font-weight: bold; font-family: monospace;">${numPriceFormula(offer30[`p${i}_price`])}</td></tr>`;
+                    eRows += `<tr><td style="padding: 2px 0;">E${i} (€/kWh):</td><td style="text-align: right; font-weight: bold; font-family: monospace;">${numPriceFormula(offer30[`p${i}_price`])}</p></td></tr>`;
                 }
                 const fullTariffName30 = `${offer30.name || 'DRK Tarifa 3.0TD/6.1TD'} - ${offer30.description || 'N/A'}`; // MODIFICACIÓN
 
@@ -2442,7 +2464,7 @@
                         </table>
                     </td></tr>
                     
-                    ${preciosResumenSection}
+                    ${preciosConsolidadosHTML}
                     
                     <tr><td colspan="2"><div style="background-color: ${D_PRIMARY_MED}; color: white; font-weight: bold; padding: 8px; font-size: 14px; margin-top: 10px;">DESGLOSE INDIVIDUAL DE AHORRO</div></td></tr>
                     ${individualBreakdowns}
