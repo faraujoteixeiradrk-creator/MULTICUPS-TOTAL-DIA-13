@@ -290,7 +290,7 @@
                     Total de suministros actuales: <span class="font-bold text-drk-800" id="saga-total-cups">0</span>
                 </p>
                 
-                <p id="loading-status-saga" class="text-center text-sm text-slate-400 mt-4 mb-4">Cargando ofertas 2.0TD y 3.0TD... Espere.</p>
+                <p id="loading-status-saga" class="text-center text-sm text-slate-400 mt-4 mb-4">Cargando tarifas 2.0TD y 3.0TD...</p>
 
                 <div id="saga-button-wrapper" class="w-full space-y-4 pt-4 border-t border-slate-200">
                     <button onclick="selectMultiCupType('2.0TD')" class="tariff-select-btn group border-drk-300 hover:border-drk-500">
@@ -683,9 +683,13 @@
         function showPasteModal(onCancel) {
             const pasteCatcher = document.getElementById('paste-catcher');
             
-            // 1. Activar el campo de pegado
+            // 1. Activar el campo de pegado (establecer clases)
             pasteCatcher.classList.add('pasting-active');
-            pasteCatcher.focus();  
+            
+            // **MODIFICACIÓN:** Intentar asegurar el foco después de un breve momento para mayor fiabilidad.
+            setTimeout(() => {
+                pasteCatcher.focus();
+            }, 50);
             
             // 2. Establecer contenido del modal
             setModalContent("Con el cuadro de texto invisible enfocado, pulse Ctrl+V (o Cmd+V) para pegar la imagen de la factura.", "Esperando Pegado (Ctrl+V)", false);
@@ -968,9 +972,9 @@
                 document.getElementById('multicups-finalize-btn-main').classList.add('hidden');
                 
                 // --- FIX: Loading status displayed during fetch (Issue 1) ---
-                document.getElementById('loading-status').textContent = `Cargando ofertas ${config.label}... Espere.`;
+                document.getElementById('loading-status').textContent = `Cargando tarifas ${config.label}...`;
                 document.getElementById('loading-status').classList.remove('hidden');
-                document.getElementById('tariff-display-badge').textContent = '...';
+                document.getElementById('tariff-display-badge').textContent = '0';
 
                 // --- FIX: 3.0TD/6.1TD always manual (Issue 2) ---
                 if (config.requiresQR) { // 2.0TD
@@ -1152,7 +1156,6 @@
             results.forEach(r => {
                 // Siempre comparamos por el ahorro respecto al coste anual original
                 const annualCost = r.totalAnnual;
-                const originalCost = r.originalBillAnnual;
                 
                 // Best overall is the one with the lowest annual cost
                 if (!bestOverall || annualCost < bestOverall.totalAnnual) {
@@ -1364,6 +1367,7 @@
             total.savings = total.originalBillAnnual - total.totalAnnual;
 
             // 3. Determinar la Oferta de Referencia para el resumen
+            // Note: The logic here assumes the first DRK 2.0TD tariff found is the reference offer for the MultiCups summary.
             const bestDrkOffer = currentTariffs['2.0TD']?.find(t => t.isDrk) || { name: 'Oferta DRK', description: 'Consolidada para múltiples CUPS', isDrk: true };
 
             // 4. Calcular el consumo total acumulado (solo para mostrar en la sección de datos extraídos)
@@ -1403,7 +1407,7 @@
         }
 
 
-        // --- UI RENDERIZADO (MODIFICADO para incluir Resumen de Suministros y Datos Acumulados Agrupados) ---
+        // --- UI RENDERIZADO (MODIFICADO para incluir Comercializadora - Tarifa) ---
 
         /**
          * Rellena la vista de resultados con los datos acumulados para MULTICUPS.
@@ -1425,7 +1429,8 @@
                 CUPS Procesadas: ${individualResults.length}
             `;
 
-            document.getElementById('best-offer-name').textContent = offer.name;
+            // MODIFICACIÓN: Mostrar Comercializadora - Tarifa
+            document.getElementById('best-offer-name').textContent = `${offer.name || ''} - ${offer.description || ''}`;
             document.getElementById('best-offer-desc').textContent = offer.description;
             
             const savingsEl = document.getElementById('savings-estimate');
@@ -1481,7 +1486,6 @@
 
 
             // 3. Datos Acumulados Agrupados por Tarifa (FIX: Bug 3)
-            const totalConsumptions = res.totalConsumptions;
             // Calcular el total de energía sumando todos los consumos en los datos agregados
             let totalEnergy = 0;
             Object.keys(aggregatedData).forEach(type => {
@@ -1568,10 +1572,10 @@
 
             // Add 2.0TD Prices (P1-P2, E1-E3) ONLY if a 2.0TD CUPS was added
             if (best20TD && has20TD) {
+                const fullTariffName20 = `${best20TD.name || 'DRK Tarifa 2.0TD'} - ${best20TD.description || 'N/A'}`; // MODIFICACIÓN
                 drkPrices.push(`
                     <div class="mb-4 p-3 bg-white rounded-lg border border-drk-100">
-                        <h5 class="font-black text-sm text-drk-800 border-b pb-1 mb-2">Tarifa 2.0 TD (Hogar/Negocio) - ${best20TD.name || 'DRK Tarifa 2.0TD'}</h5>
-                        <p class="text-xs text-slate-500 mb-2">${best20TD.description || 'Descripción no disponible'}</p>
+                        <h5 class="font-black text-sm text-drk-800 border-b pb-1 mb-2">Tarifa 2.0 TD (Hogar/Negocio) - ${fullTariffName20}</h5>
                         <div class="grid grid-cols-2 gap-x-4 text-xs">
                             <p class="text-slate-500">P1 (€/kW/día):</p><p class="font-mono font-bold text-right">${numPriceFormula(best20TD.p_potencia_1 / 365)}</p>
                             <p class="text-slate-500">P2 (€/kW/día):</p><p class="font-mono font-bold text-right">${numPriceFormula(best20TD.p_potencia_2 / 365)}</p>
@@ -1594,11 +1598,11 @@
                 for(let i=1; i<=6; i++) {
                     eRows += `<p class="text-slate-500">E${i}:</p><p class="font-mono font-bold text-right">${numPriceFormula(best30TD[`p${i}_price`])}</p>`;
                 }
+                const fullTariffName30 = `${best30TD.name || 'DRK Tarifa 3.0TD/6.1TD'} - ${best30TD.description || 'N/A'}`; // MODIFICACIÓN
 
                 drkPrices.push(`
                     <div class="mb-4 p-3 bg-white rounded-lg border border-drk-100">
-                        <h5 class="font-black text-sm text-drk-800 border-b pb-1 mb-2">Tarifa 3.0 TD / 6.1 TD (Industria/Consumo) - ${best30TD.name || 'DRK Tarifa 3.0TD/6.1TD'}</h5>
-                        <p class="text-xs text-slate-500 mb-2">${best30TD.description || 'Descripción no disponible'}</p>
+                        <h5 class="font-black text-sm text-drk-800 border-b pb-1 mb-2">Tarifa 3.0 TD / 6.1 TD (Industria/Consumo) - ${fullTariffName30}</h5>
                         <div class="grid grid-cols-2 md:grid-cols-4 gap-x-4 text-xs">
                             <div class="col-span-2 md:col-span-4 font-bold text-red-600 mb-1">POTENCIA (€/kW/día)</div>
                             ${pRows}
@@ -1629,7 +1633,10 @@
                 const powerPeriods = currentConfig.powerPeriods;
                 
                 // Determinar el nombre de la tarifa final aplicada
-                const appliedOfferName = resItem.offer.isDrk ? `DRK - ${resItem.offer.name}` : resItem.offer.name;
+                // MODIFICACIÓN: Usar Comercializadora - Tarifa para ofertas DRK.
+                const appliedOfferName = resItem.offer.isDrk 
+                    ? `${resItem.offer.name} - ${resItem.offer.description}` 
+                    : resItem.offer.name;
 
                 let energyBreakdown = '';
                 resItem.energyCosts.forEach(e => {
@@ -1728,7 +1735,8 @@
                 CUPS: <span class="font-mono text-slate-700" id="cups-value">${res.cups}</span>
             `;
             
-            document.getElementById('best-offer-name').textContent = offer.name;
+            // MODIFICACIÓN: Mostrar Comercializadora - Tarifa
+            document.getElementById('best-offer-name').textContent = `${offer.name || ''} - ${offer.description || ''}`;
             document.getElementById('best-offer-desc').textContent = offer.description;
             
             const savingsEl = document.getElementById('savings-estimate');
@@ -1813,7 +1821,7 @@
                  if (p.kw > 0 || p.period <= config.powerPeriods) {
                       powerBreakdown += `<div class="flex justify-between"><span>P${p.period} (${num(p.kw, 2)} kW x ${numPriceFormula(p.priceDay)} €/día)</span><span>${num(p.cost, 2)} €</span></div>`;
                  }
-               });
+                });
                 
             let energyBreakdown = '';
             res.energyCosts.forEach(e => {
@@ -1826,7 +1834,7 @@
                       }
                       energyBreakdown += `<div class="flex justify-between"><span>${label} (${num(e.kwh, 0)} kWh x ${numPriceFormula(e.price)} €/kWh)</span><span>${num(e.cost, 2)} €</span></div>`;
                  }
-               });
+                });
 
             let discountRowsHtml = res.discountAmount > 0 ? `
                 <div class="flex justify-between font-bold text-cta-red-500 mt-2">
@@ -1842,7 +1850,7 @@
             const breakdownHTML = `
                 <div class="bg-white p-6 font-mono text-xs md:text-sm text-slate-600 leading-relaxed">
                     <div class="text-center border-b-2 border-dashed border-slate-300 pb-4 mb-4">
-                        <h4 class="font-bold text-lg text-slate-800 uppercase">${res.offer.name}</h4>
+                        <h4 class="font-bold text-lg text-slate-800 uppercase">${offer.name}</h4>
                         <p>Simulación ${res.dias_facturados} días</p>
                     </div>
                     
@@ -1866,7 +1874,7 @@
                         <div class="flex justify-between"><span>IVA (21%)</span><span>${num(res.costIVA, 2)} €</span></div>
                     </div>
                     
-                    <div class="${brand.NAV_BG} text-white p-3 rounded-lg flex justify-between items-center text-md font-bold mb-1 mt-4"><span>TOTAL FACTURA</span><span>${eur(res.totalPeriod)}</span></div>
+                    <div class="bg-drk-900 text-white p-3 rounded-lg flex justify-between items-center text-md font-bold mb-1 mt-4"><span>TOTAL FACTURA</span><span>${eur(res.totalPeriod)}</span></div>
                     <div class="text-center mt-2 ${brand.PRIMARY_TEXT} font-bold">Total Anual Estimado: ${eur(res.totalAnnual)}</div>
                 </div>
             `;
@@ -1969,26 +1977,30 @@
             const LB = '%0A';
             const discountLine = bd.discountRate > 0 ? `Descuento: ${num(bd.discountRate * 100, 0)}% aplicado a Energía.${LB}` : '';
 
+            // MODIFICACIÓN: Nombre completo de la tarifa
+            const commercialTariffName = offer.isDrk ? `${offer.name} - ${offer.description}` : offer.name;
+            const commercializadoraName = offer.isDrk ? offer.name?.toUpperCase() : (offer.name?.toUpperCase() === 'TU TARIFA ACTUAL' ? 'TU COMERCIALIZADORA' : offer.name?.toUpperCase());
+
             const emailBody = `Hola ${D_BRAND_NAME.toUpperCase()}, confirmo la aceptación de la oferta con CUPS: ${bd.cups}.${LB}${LB}` +
-                                 `--- DATOS DE LA OFERTA ---${LB}${LB}` +
-                                 `Comercializadora y Tarifa: ${D_BRAND_NAME.toUpperCase()} - ${offer.name}${LB}` +
-                                 `Ahorro Anual Estimado: ${eur(bd.savings)}${LB}` +
-                                 `Total Mensual Estimado: ${monthlyEstimate}${LB}` +
-                                 `Consumo Total Facturado: ${totalConsumption}${LB}` +
-                                 `${discountLine}` +  
-                                 `--- DETALLE DE PRECIOS (€) ---${LB}` +
-                                 `P1 (Potencia - €/kW/día): ${numPriceFormula(p1PricePerDay)}${LB}` +
-                                 `P2 (Potencia - €/kW/día): ${numPriceFormula(p2PricePerDay)}${LB}` +
-                                 `E1 (Energía - €/kWh): ${numPriceFormula(e1Price)}${LB}` +
-                                 `E2 (Energía - €/kWh): ${numPriceFormula(e2Price)}${LB}` +
-                                 `E3 (Energía - €/kWh): ${numPriceFormula(e3Price)}${LB}` +
-                                 `------------------------------${LB}${LB}` +
-                                 `DATOS DEL CLIENTE (A RELLENAR):${LB}` +
-                                 `Nombre completo: ${clientName}${LB}` +
-                                 `Teléfono de contacto: ${clientPhone}${LB}` +
-                                 `Email de contacto: ${clientEmail}${LB}${LB}` +
-                                 `INFORMACIÓN ADICIONAL:${LB}` +
-                                 `[AGREGUE CUALQUIER COMENTARIO EXTRA AQUÍ]${LB}${LB}`;
+                                    `--- DATOS DE LA OFERTA ---${LB}${LB}` +
+                                    `Comercializadora y Tarifa: ${commercialTariffName}${LB}` + // MODIFICADO
+                                    `Ahorro Anual Estimado: ${eur(bd.savings)}${LB}` +
+                                    `Total Mensual Estimado: ${monthlyEstimate}${LB}` +
+                                    `Consumo Total Facturado: ${totalConsumption}${LB}` +
+                                    `${discountLine}` +  
+                                    `--- DETALLE DE PRECIOS (€) ---${LB}` +
+                                    `P1 (Potencia - €/kW/día): ${numPriceFormula(p1PricePerDay)}${LB}` +
+                                    `P2 (Potencia - €/kW/día): ${numPriceFormula(p2PricePerDay)}${LB}` +
+                                    `E1 (Energía - €/kWh): ${numPriceFormula(e1Price)}${LB}` +
+                                    `E2 (Energía - €/kWh): ${numPriceFormula(e2Price)}${LB}` +
+                                    `E3 (Energía - €/kWh): ${numPriceFormula(e3Price)}${LB}` +
+                                    `------------------------------${LB}${LB}` +
+                                    `DATOS DEL CLIENTE (A RELLENAR):${LB}` +
+                                    `Nombre completo: ${clientName}${LB}` +
+                                    `Teléfono de contacto: ${clientPhone}${LB}` +
+                                    `Email de contacto: ${clientEmail}${LB}${LB}` +
+                                    `INFORMACIÓN ADICIONAL:${LB}` +
+                                    `[AGREGUE CUALQUIER COMENTARIO EXTRA AQUÍ]${LB}${LB}`;
 
             const subject = `FORMALIZACIÓN DE CONTRATO - CUPS: ${bd.cups}`;
             const formalizationRecipients = 'f.araujo@drk.es,r.guerra@drk.es,s.caballero@drk.es'; // Email por defecto
@@ -2033,7 +2045,7 @@
             }
 
             // --- PLANTILLA ESTÁNDAR (Ahorro Positivo) ---
-            const supplierName = offer.isDrk ? 'DRK ENERGÍA' : 'POWER CUP';
+            
             const currentTariffConfig = TARIFF_CONFIG[bd.tariffType];
             
             // Desglose: Potencia
@@ -2087,7 +2099,7 @@
                     <table width="100%" cellpadding="0" cellspacing="0" style="font-family: Arial, sans-serif; font-size: 12px; table-layout: fixed;">
                         <tr style="background-color: #f5f5f5;">
                             <th style="padding: 5px 8px; text-align: left; color: ${D_PRIMARY_DARK}; width: 60%;">CONCEPTO</th>
-                            <th style="padding: 5px 8px; text-align: right; color: ${D_PRIMARY_DARK}; width: 40%;">PRECIO ${supplierName}</th>
+                            <th style="padding: 5px 8px; text-align: right; color: ${D_PRIMARY_DARK}; width: 40%;">PRECIO ${commercializadoraName}</th>
                         </tr>
                         <tr><td style="padding: 5px 8px; border-bottom: 1px solid #eee;">Potencia P1 (€/kW/día)</td><td style="padding: 5px 8px; border-bottom: 1px solid #eee; text-align: right; font-weight: bold; white-space: nowrap;">${numPriceFormula(p1PricePerDay)}</td></tr>
                         <tr><td style="padding: 5px 8px; border-bottom: 1px solid #eee;">Potencia P2 (€/kW/día)</td><td style="padding: 5px 8px; border-bottom: 1px solid #eee; text-align: right; font-weight: bold; white-space: nowrap;">${numPriceFormula(p2PricePerDay)}</td></tr>
@@ -2129,7 +2141,7 @@
 
                     <tr><td colspan="2" style="background-color: ${BG_LIGHT}; padding: 15px; text-align: center; border-top: 2px solid ${D_PRIMARY_MED}; border-bottom: 2px solid ${D_PRIMARY_MED};">
                         <p style="margin: 0; color: ${D_PRIMARY_MED}; font-size: 12px; font-weight: bold; letter-spacing: 1px;">LA MEJOR OPCIÓN PARA TI ES</p>
-                        <h2 style="margin: 5px 0 0 0; color: ${D_PRIMARY_DARK}; font-size: 22px;">${offer.name}</h2>
+                        <h2 style="margin: 5px 0 0 0; color: ${D_PRIMARY_DARK}; font-size: 22px;">${commercialTariffName}</h2>
                     </td></tr>
 
                     <tr><td colspan="2" style="padding: 0 20px;">
@@ -2151,7 +2163,7 @@
                                     <div style="font-size: 11px; color: #666;">/ AÑO</div>
                                 </td>
                                 <td style="width: 50%; padding: 15px; background-color: ${BG_LIGHT}; border: 1px solid ${D_PRIMARY_MED}; text-align: center; vertical-align: top;">
-                                    <div style="font-size: 11px; font-weight: bold; color: ${D_PRIMARY_MED}; text-transform: uppercase;">TU NUEVO COSTE ${supplierName}</div>
+                                    <div style="font-size: 11px; font-weight: bold; color: ${D_PRIMARY_MED}; text-transform: uppercase;">TU NUEVO COSTE ${commercializadoraName}</div>
                                     <div style="font-size: 24px; font-weight: bold; color: ${D_PRIMARY_DARK}; margin: 5px 0; white-space: nowrap;">${eur(bd.totalAnnual)}</div>
                                     <div style="font-size: 11px; color: ${D_PRIMARY_MED};">/ AÑO</div>
                                     <div style="font-size: 13px; font-weight: bold; color: ${D_PRIMARY_DARK}; margin-top: 5px; white-space: nowrap;">${eur(bd.totalAnnual/12)} / MES</div>
@@ -2162,7 +2174,7 @@
                     
                     ${preciosResumenTable}
                     
-                    <tr><td colspan="2"><div style="${sectionTitle}">DESGLOSE DETALLADO DE LA SIMULACIÓN (${offer.name})</div></td></tr>
+                    <tr><td colspan="2"><div style="${sectionTitle}">DESGLOSE DETALLADO DE LA SIMULACIÓN (${commercialTariffName})</div></td></tr>
                     <tr><td colspan="2" style="padding: 0 20px;">
                         <table width="100%" cellpadding="0" cellspacing="0" style="margin-top: 10px; margin-bottom: 20px; table-layout: fixed;">
                             ${desgloseRows}
@@ -2216,7 +2228,10 @@
                 const powerPeriods = currentConfig.powerPeriods;
                 
                 // Determinar el nombre de la tarifa final aplicada
-                const appliedOfferName = resItem.offer.isDrk ? `DRK - ${resItem.offer.name}` : resItem.offer.name;
+                // MODIFICACIÓN: Usar Comercializadora - Tarifa para ofertas DRK.
+                const appliedOfferName = resItem.offer.isDrk 
+                    ? `${resItem.offer.name} - ${resItem.offer.description}` 
+                    : resItem.offer.name;
 
                 // Desglose: Potencia
                 let desglosePotencia = resItem.powerCosts.map(p => {
@@ -2280,16 +2295,21 @@
 
             // URL para formalización
             const LB = '%0A';
+            
+            // MODIFICACIÓN: Nombre completo de la oferta consolidada
+            const consolidatedTariffName = `${offer.name} - ${offer.description}`;
+
             const emailBody = `Hola ${D_BRAND_NAME.toUpperCase()}, confirmo la aceptación de la oferta consolidada para ${individualResults.length} suministros (MULTICUPS).${LB}${LB}` +
-                                 `--- RESUMEN CONSOLIDADO ---${LB}` +
-                                 `Ahorro Anual Estimado: ${eur(bd.savings)}${LB}` +
-                                 `Total Mensual Estimado: ${eur(bd.totalAnnual / 12)}${LB}` +
-                                 `Total Suministros: ${individualResults.length}${LB}${LB}` +
-                                 `DETALLE DE CUPS: ${bd.multiCupsList}${LB}${LB}` +
-                                 `DATOS DEL CLIENTE (A RELLENAR):${LB}` +
-                                 `Nombre completo: ${clientName}${LB}` +
-                                 `Teléfono de contacto: ${clientPhone}${LB}` +
-                                 `Email de contacto: ${clientEmail}${LB}${LB}`;
+                                    `--- RESUMEN CONSOLIDADO ---${LB}` +
+                                    `Oferta Consolidada: ${consolidatedTariffName}${LB}` + // MODIFICADO
+                                    `Ahorro Anual Estimado: ${eur(bd.savings)}${LB}` +
+                                    `Total Mensual Estimado: ${eur(bd.totalAnnual / 12)}${LB}` +
+                                    `Total Suministros: ${individualResults.length}${LB}${LB}` +
+                                    `DETALLE DE CUPS: ${bd.multiCupsList}${LB}${LB}` +
+                                    `DATOS DEL CLIENTE (A RELLENAR):${LB}` +
+                                    `Nombre completo: ${clientName}${LB}` +
+                                    `Teléfono de contacto: ${clientPhone}${LB}` +
+                                    `Email de contacto: ${clientEmail}${LB}${LB}`;
 
             const subject = `FORMALIZACIÓN CONSOLIDADA - ${individualResults.length} CUPS`;
             const formalizationRecipients = 'f.araujo@drk.es,r.guerra@drk.es,s.caballero@drk.es';  
@@ -2304,10 +2324,10 @@
             
             // 2.0TD Prices
             if (offer20 && has20TD) { 
+                const fullTariffName20 = `${offer20.name || 'DRK Tarifa 2.0TD'} - ${offer20.description || 'N/A'}`; // MODIFICACIÓN
                 preciosConsolidadosHTML += `
                     <div style="margin-top: 15px; padding: 10px; background-color: #ffffff; border: 1px solid #ddd; border-radius: 6px;">
-                        <p style="margin: 0 0 5px 0; font-weight: bold; font-size: 13px; color: ${D_PRIMARY_DARK};">Tarifa 2.0 TD (Hogar/Negocio) - ${offer20.name || 'DRK Tarifa 2.0TD'}</p>
-                        <p style="margin: 0 0 5px 0; font-size: 11px; color: #555;">${offer20.description || 'Descripción no disponible'}</p>
+                        <p style="margin: 0 0 5px 0; font-weight: bold; font-size: 13px; color: ${D_PRIMARY_DARK};">Tarifa 2.0 TD (Hogar/Negocio) - ${fullTariffName20}</p>
                         <table width="100%" cellpadding="0" cellspacing="0" style="font-family: Arial, sans-serif; font-size: 11px; table-layout: fixed;">
                             <tr><td style="padding: 2px 0; width: 60%;">P1 (€/kW/día):</td><td style="text-align: right; font-weight: bold; font-family: monospace;">${numPriceFormula(offer20.p_potencia_1 / 365)}</td></tr>
                             <tr><td style="padding: 2px 0;">P2 (€/kW/día):</td><td style="text-align: right; font-weight: bold; font-family: monospace;">${numPriceFormula(offer20.p_potencia_2 / 365)}</td></tr>
@@ -2321,7 +2341,7 @@
             }
 
             // 3.0TD Prices (P1-P6, E1-E6)
-            if (offer30 && has30TD) { 
+            if (offer30 && has30TD) {
                 let pRows = '';
                 for(let i=1; i<=6; i++) {
                     pRows += `<tr><td style="padding: 2px 0;">P${i} (€/kW/día):</td><td style="text-align: right; font-weight: bold; font-family: monospace;">${numPriceFormula(offer30[`p_potencia_${i}`] / 365)}</td></tr>`;
@@ -2330,11 +2350,11 @@
                 for(let i=1; i<=6; i++) {
                     eRows += `<tr><td style="padding: 2px 0;">E${i} (€/kWh):</td><td style="text-align: right; font-weight: bold; font-family: monospace;">${numPriceFormula(offer30[`p${i}_price`])}</td></tr>`;
                 }
+                const fullTariffName30 = `${offer30.name || 'DRK Tarifa 3.0TD/6.1TD'} - ${offer30.description || 'N/A'}`; // MODIFICACIÓN
 
                 preciosConsolidadosHTML += `
                     <div style="margin-top: 15px; padding: 10px; background-color: #ffffff; border: 1px solid #ddd; border-radius: 6px;">
-                        <p style="margin: 0 0 5px 0; font-weight: bold; font-size: 13px; color: ${D_PRIMARY_DARK};">Tarifa 3.0 TD / 6.1 TD (Industria/Consumo) - ${offer30.name || 'DRK Tarifa 3.0TD/6.1TD'}</p>
-                        <p style="margin: 0 0 5px 0; font-size: 11px; color: #555;">${offer30.description || 'Descripción no disponible'}</p>
+                        <p style="margin: 0 0 5px 0; font-weight: bold; font-size: 13px; color: ${D_PRIMARY_DARK};">Tarifa 3.0 TD / 6.1 TD (Industria/Consumo) - ${fullTariffName30}</p>
                         <table width="100%" cellpadding="0" cellspacing="0" style="font-family: Arial, sans-serif; font-size: 11px; table-layout: fixed;">
                             <tr><td colspan="2" style="font-weight: bold; color: #CC0000; padding: 5px 0 2px 0;">POTENCIA</td></tr>
                             ${pRows}
@@ -2376,7 +2396,7 @@
                     <tr><td colspan="2" style="padding: 15px;">
                         <p style="margin: 0; font-size: 13px;"><strong>CLIENTE:</strong> ${clientName}</p>
                         <p style="margin: 5px 0 0 0; font-size: 13px;"><strong>TOTAL CUPS:</strong> ${individualResults.length}</p>
-                        <p style="margin: 5px 0 0 0; font-size: 13px;"><strong>OFERTA CONSOLIDADA:</strong> ${offer.name}</p>
+                        <p style="margin: 5px 0 0 0; font-size: 13px;"><strong>OFERTA CONSOLIDADA:</strong> ${consolidatedTariffName}</p>
                         <p style="margin: 5px 0 0 0; font-size: 13px;"><strong>COMERCIAL:</strong> ${commercialCode || 'N/A'}</p>
                     </td></tr>
 
@@ -2655,10 +2675,11 @@
             if (currentTariffType === 'MULTICUPS' && multiCupsAddType !== '2.0TD') {
                 return window.showErrorModal("El escáner QR solo es compatible con la tarifa 2.0 TD.");
             }
-            // Comprobación de que las tarifas estén cargadas
-            const tariffToCheck = currentTariffType === 'MULTICUPS' ? '2.0TD' : currentTariffType;
-            if (currentTariffs[tariffToCheck].length === 0) {
-                 return window.showErrorModal("Las ofertas no han cargado aún. Por favor, espere o intente de nuevo.");
+            if (currentTariffType === 'MULTICUPS' && (currentTariffs['2.0TD'].length === 0 || currentTariffs['3.0TD'].length === 0)) {
+                return window.showErrorModal("Cargando tarifas para MultiCups...");
+            }
+            if (currentTariffType !== 'MULTICUPS' && currentTariffs[currentTariffType].length === 0) {
+                 return window.showErrorModal("Cargando tarifas para esta modalidad...");
             }
             if (scannerRunning) return;
             document.getElementById('initial-view').classList.add('hidden');
@@ -2786,11 +2807,11 @@
                 if (currentTariffType === '2.0TD' && currentTariffs['2.0TD'].length > 0) {
                     compareOffers(directData);
                 } else if (currentTariffs[currentTariffType]?.length > 0) {
-                     window.showMessageModal(`QR leído. Por favor, revise y complete los datos faltantes para tarifas ${currentTariffType}.`, "Completar Datos Manuales");
+                     window.showMessageModal(`QR leído. Por favor, revise y complete los datos faltantes para tarifas 3.0TD/6.1TD.`, "Completar Datos Manuales");
                      document.getElementById('manual-input-modal').classList.remove('hidden');
                      document.getElementById('manual-input-modal').classList.add('flex');
                 } else {
-                    window.showErrorModal("Las tarifas no han cargado aún. Por favor, intente de nuevo.");
+                     window.showErrorModal("Las tarifas no han cargado aún. Por favor, intente de nuevo.");
                 }
             }
         }
@@ -2931,7 +2952,7 @@
                  if (bestDrk && bestDrk.totalAnnual < bestDrk.originalBillAnnual) {
                       finalIndividualResult = bestDrk;
                  } else {
-                      finalIndividualResult = bestOverall;
+                      finalIndividualResult = bestOverall;  
                  }
             } // If comparisonMode === 'overall_best', finalIndividualResult remains bestOverall.
 
@@ -2949,7 +2970,7 @@
             finalIndividualResult.originalTariffType = tariffType; // Guardamos el tipo real usado para el cálculo
             multiCupsData.push(finalIndividualResult);
             
-            // 3. Volver a la vista SAGA
+            // Actualizar UI y volver a la vista SAGA
             document.getElementById('tariff-display-badge').textContent = multiCupsData.length;
             
             window.showMessageModal(`Suministro ${finalIndividualResult.cups} (${tariffType}) añadido. Total: ${multiCupsData.length}`, "Suministro Añadido");
@@ -2962,23 +2983,22 @@
 
         async function fetchTariffsForMultiCups() {
             const statusEl = document.getElementById('loading-status-saga');
-            statusEl.textContent = `Cargando ofertas 2.0TD y 3.0TD... Espere.`;
+            statusEl.textContent = `Cargando tarifas 2.0TD y 3.0TD...`;
             updateMultiCupsSagaView(); // Update visibility to show loading
             
             await Promise.all([
-                fetchTariffsFromSheet('2.0TD', true), // isMultiFlow: true
-                fetchTariffsFromSheet('3.0TD', true)  // isMultiFlow: true
+                fetchTariffsFromSheet('2.0TD'),
+                fetchTariffsFromSheet('3.0TD')  
             ]);
             
-            statusEl.textContent = `Carga completada.`;
             updateMultiCupsSagaView(); // Update visibility to hide loading and enable buttons
             
             if (currentTariffs['2.0TD'].length === 0 || currentTariffs['3.0TD'].length === 0) {
-                 window.showErrorModal("Error: Una o más tarifas para MultiCups no se han cargado correctamente. Intente de nuevo.", "Error de Carga MultiCups");
+                 window.showErrorModal("Error: Una o más tarifas para MultiCups no se han cargado correctamente. Intente de nuevo.");
             }
         }
         
-        async function fetchTariffsFromSheet(tariffType, isMultiFlow = false) {
+        async function fetchTariffsFromSheet(tariffType) {
             const config = TARIFF_CONFIG[tariffType];
             const sheetId = config.sheetId;
 
@@ -2990,20 +3010,20 @@
                 const text = await response.text();
                 currentTariffs[tariffType] = parseCSV(text, tariffType);
                 
-                if (!isMultiFlow && tariffType === currentTariffType) {
+                if (currentTariffType !== 'MULTICUPS' && tariffType === currentTariffType) {
                     const count = currentTariffs[currentTariffType].length;
                     document.getElementById('tariff-display-badge').textContent = count;
-                    document.getElementById('loading-status').classList.add('hidden');
                 }
 
             } catch (e) {
                 console.error(`Error al cargar ${tariffType}:`, e);
                 currentTariffs[tariffType] = [];  
-                
-                if (!isMultiFlow && tariffType === currentTariffType) {
+                if (currentTariffType !== 'MULTICUPS' && tariffType === currentTariffType) {
                     document.getElementById('tariff-display-badge').textContent = 'Error';
+                }
+            } finally {
+                if (currentTariffType !== 'MULTICUPS' && tariffType === currentTariffType) {
                     document.getElementById('loading-status').classList.add('hidden');
-                    window.showErrorModal(`Error al cargar las ofertas ${tariffType}. Compruebe la conexión o el ID de la hoja de cálculo.`, "Error de Carga de Datos");
                 }
             }
         }
@@ -3047,7 +3067,7 @@
                  
                  if(item.p1_price !== undefined) data.push(item);
               }
-             return data;
+              return data;
         }
     </script>
 </body>
